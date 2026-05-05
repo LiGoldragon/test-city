@@ -485,6 +485,7 @@ done
 
 run_isolated gc --city "$initialized_city" session list --state all --json \
   >"$artifacts_dir/session-list.final.json" 2>"$artifacts_dir/session-list.final.stderr" || true
+capture_dolt_config_table
 find "$initialized_city" -maxdepth 6 -type f | sort >"$artifacts_dir/initialized-files.txt"
 
 write_result "observed" "observation completed"
