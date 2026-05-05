@@ -28,6 +28,24 @@
 
         sourceRoot = ./.;
         stockGascityCommit = "67c821c76f17226883e7153a324dadcfe80ec211";
+        stockPrebuiltAssets = {
+          x86_64-linux = {
+            url = "https://github.com/gastownhall/gascity/releases/download/v1.0.0/gascity_1.0.0_linux_amd64.tar.gz";
+            hash = "sha256-zEXmvlTGuwD+aRWCn4vquyWlhbYEpHhGhFqnuacDcNM=";
+          };
+          aarch64-linux = {
+            url = "https://github.com/gastownhall/gascity/releases/download/v1.0.0/gascity_1.0.0_linux_arm64.tar.gz";
+            hash = "sha256-DTEHuDyk460zzG4UWEQHnR9AJzBMYh4HHy8IXGTZpno=";
+          };
+          x86_64-darwin = {
+            url = "https://github.com/gastownhall/gascity/releases/download/v1.0.0/gascity_1.0.0_darwin_amd64.tar.gz";
+            hash = "sha256-1051hj7RacC12/a2X5My980BbbEyEcyKQ4+A57glMZw=";
+          };
+          aarch64-darwin = {
+            url = "https://github.com/gastownhall/gascity/releases/download/v1.0.0/gascity_1.0.0_darwin_arm64.tar.gz";
+            hash = "sha256-S2zb/9UotLKYUQj82OIS0m3s7uzHjkso+VoJx+MJFFk=";
+          };
+        };
 
         mkGascity = { version, commit, source }:
           pkgs.buildGo125Module {
@@ -69,6 +87,41 @@
           source = gascity-v1-0;
         };
 
+        gascityStockV1Prebuilt =
+          let
+            asset = stockPrebuiltAssets.${system} or (throw "No Gas City v1.0.0 prebuilt asset for ${system}");
+          in
+          pkgs.stdenvNoCC.mkDerivation {
+            pname = "gascity-prebuilt";
+            version = "1.0.0";
+            src = pkgs.fetchurl asset;
+            dontPatchELF = true;
+
+            unpackPhase = ''
+              runHook preUnpack
+              mkdir source
+              tar -xzf "$src" -C source
+              cd source
+              runHook postUnpack
+            '';
+
+            installPhase = ''
+              runHook preInstall
+              install -Dm755 gc "$out/bin/gc"
+              install -Dm644 LICENSE "$out/share/licenses/gascity/LICENSE"
+              install -Dm644 README.md "$out/share/doc/gascity/README.md"
+              runHook postInstall
+            '';
+
+            meta = with pkgs.lib; {
+              description = "Prebuilt upstream Gas City v1.0.0 release binary";
+              homepage = "https://github.com/gastownhall/gascity/releases/tag/v1.0.0";
+              license = licenses.mit;
+              mainProgram = "gc";
+              platforms = builtins.attrNames stockPrebuiltAssets;
+            };
+          };
+
         cityRuntimeDeps = gascityPackage: with pkgs; [
           gascityPackage
           dolt
@@ -88,6 +141,7 @@
           gawk
           findutils
           jq
+          shellcheck
         ];
 
         prepareStockCity = pkgs.writeShellApplication {
@@ -109,6 +163,35 @@
             exec ${pkgs.bash}/bin/bash ${sourceRoot}/scripts/tear-down-test-city.sh "$@"
           '';
         };
+
+        mkIdleDoltAmpRunner = { name, gascityPackage, release, commit, provenance }:
+          pkgs.writeShellApplication {
+            inherit name;
+            runtimeInputs = cityRuntimeDeps gascityPackage ++ harnessDeps;
+            text = ''
+              export TEST_CITY_SOURCE_ROOT=${sourceRoot}
+              export TEST_CITY_GASCITY_RELEASE=${release}
+              export TEST_CITY_GASCITY_COMMIT=${commit}
+              export TEST_CITY_BINARY_LANE=${provenance}
+              exec ${pkgs.bash}/bin/bash ${sourceRoot}/scripts/${name}.sh "$@"
+            '';
+          };
+
+        runIdleStockSource = mkIdleDoltAmpRunner {
+          name = "run-idle-stock-source";
+          gascityPackage = gascityStockV1;
+          release = "stock-v1.0.0";
+          commit = stockGascityCommit;
+          provenance = "source-built";
+        };
+
+        runIdleStockPrebuilt = mkIdleDoltAmpRunner {
+          name = "run-idle-stock-prebuilt";
+          gascityPackage = gascityStockV1Prebuilt;
+          release = "stock-v1.0.0";
+          commit = stockGascityCommit;
+          provenance = "upstream-prebuilt";
+        };
       in
       {
         devShells.default = pkgs.mkShell {
@@ -119,6 +202,8 @@
             echo "test-city shell — gascity $(gc version 2>/dev/null | head -1)"
             echo "Available templates: $(ls templates 2>/dev/null | tr '\n' ' ')"
             echo "Prepare: nix run . -- <template>"
+            echo "Run idle source: nix run .#run-idle-stock-source"
+            echo "Run idle prebuilt: nix run .#run-idle-stock-prebuilt"
             echo "Tear down: nix run .#tear-down -- /tmp/test-city..."
           '';
         };
@@ -128,7 +213,10 @@
           prepare-test-city = prepareStockCity;
           tear-down-test-city = tearDownTestCity;
           gascity-stock-v1-0 = gascityStockV1;
+          gascity-stock-v1-0-prebuilt = gascityStockV1Prebuilt;
           gascity-current-fork = pkgs.gascity;
+          run-idle-stock-source = runIdleStockSource;
+          run-idle-stock-prebuilt = runIdleStockPrebuilt;
         };
 
         apps = {
@@ -143,6 +231,14 @@
           tear-down = {
             type = "app";
             program = "${tearDownTestCity}/bin/tear-down-test-city";
+          };
+          run-idle-stock-source = {
+            type = "app";
+            program = "${runIdleStockSource}/bin/run-idle-stock-source";
+          };
+          run-idle-stock-prebuilt = {
+            type = "app";
+            program = "${runIdleStockPrebuilt}/bin/run-idle-stock-prebuilt";
           };
         };
       }
