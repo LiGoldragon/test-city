@@ -1,0 +1,37 @@
+[workspace]
+name = "test-upstream-main"
+prefix = "tum"
+install_agent_hooks = []
+
+[daemon]
+patrol_interval = "30s"
+max_restarts = 3
+restart_window = "1m"
+shutdown_timeout = "2s"
+probe_concurrency = 1
+max_wakes_per_tick = 2
+
+[session]
+startup_timeout = "300s"
+
+[orders]
+skip = [
+  "beads-health",
+  "cross-rig-deps",
+  "digest-generate",
+  "dolt-gc-nudge",
+  "dolt-health",
+  "dolt-remotes-patrol",
+  "gate-sweep",
+  "mol-dog-backup",
+  "mol-dog-compactor",
+  "mol-dog-doctor",
+  "mol-dog-jsonl",
+  "mol-dog-phantom-db",
+  "mol-dog-reaper",
+  "mol-dog-stale-db",
+  "orphan-sweep",
+  "prune-branches",
+  "spawn-storm-detect",
+  "wisp-compact",
+]

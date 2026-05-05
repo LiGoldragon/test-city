@@ -14,9 +14,10 @@ This repo is that controlled environment.
 
 ## Status
 
-Day-zero scaffold. Codex is the intended driver going forward (Claude is too
-slow for the iterate-test-iterate loop). This README and the flake are the
-template; codex fills in the test scenarios.
+This repo currently provides the infrastructure for creating throwaway city
+roots. The default `nix run` path prepares a minimal city template under
+`/tmp` using a stock Gas City `v1.0.0` binary package, but it does not start
+the city or run the dolt-amp scenario.
 
 The full incident report — what was seen, what was tried, what's still
 unknown, what an honest investigator would check next — is in this repo at
@@ -46,13 +47,36 @@ helper, which this repo borrows from.
 
 ## Inputs
 
-- `gascity-nix` (sibling flake): packages `gc` from a chosen gascity commit.
-  `inputs.gascity-nix.url = "github:LiGoldragon/gascity-nix"` in this flake.
-- `orchestrator` (optional): if a test scenario needs cascade dispatching,
-  wire it in via the same path the production city uses.
-- `codex` (runtime, on PATH): test cities use Li's actual codex subscription
-  for any agent that needs to actually run. Cost discipline: `gpt-5.4-mini`
-  + `model_reasoning_effort=low` is the default for any agent in a test city.
+- `gascity-v1-0`: direct source input for `gastownhall/gascity` tag
+  `v1.0.0`, commit `67c821c76f17226883e7153a324dadcfe80ec211`.
+- `gascity-nix`: kept for later fork/current-pin comparison apps.
+- `codex` is not used by the current minimal templates. Future live-agent
+  scenarios must keep `gpt-5.4-mini` and `model_reasoning_effort=low` as the
+  default.
+
+## Usage
+
+Prepare the default stock-v1.0.0 city template:
+
+```bash
+nix run
+```
+
+Prepare a named template:
+
+```bash
+nix run . -- canonical-stock
+nix run . -- upstream-main
+```
+
+Tear down the root printed by `nix run`:
+
+```bash
+nix run .#tear-down -- /tmp/test-city.XXXXXX
+```
+
+The prepare step writes `test-city.json` at the test root. That manifest is the
+structured handoff for later scenario runners.
 
 ## Inspiration: orchestrator's isolated-city pattern
 
@@ -75,14 +99,12 @@ for cascade dispatch testing; the dolt-amp investigation has different
 requirements (long-running observation rather than short cascade chains;
 heavy diagnostic capture; multiple gascity-version pinnings).
 
-## Day-one templates
+## Templates
 
-- `templates/canonical-stock/` — gascity `v1.0.0` (tag `v1.0.0`, commit
-  `67c821c7`), no fork patches, default codex builtin profile. The "what
-  ships out of the box behaves like this" baseline.
-- `templates/upstream-main/` — gascity `upstream/main` HEAD (post-1.0.0 with
-  ~389 commits including reconciler/session fixes). The "what's actually
-  current upstream and might be more stable" pin.
+- `templates/canonical-stock/` — minimal city config for the stock `v1.0.0`
+  package exposed by this flake.
+- `templates/upstream-main/` — same city shape reserved for an upstream-main
+  package once that comparison app is wired.
 
 Other variants codex can add:
 - `templates/fork-codex-model/` — `LiGoldragon/gascity` rebased v1.0.0 with
@@ -93,9 +115,9 @@ Other variants codex can add:
   same surface (PR #563 respawn circuit breaker, PR #1702 pending-create
   start lease, etc.).
 
-Each template has its own `flake.nix` import overriding the gascity-nix pin
-to the chosen commit, plus a `city.toml` + `pack.toml` minimum so a single
-agent can reach `state=active` and a single bead can be slung.
+Each template carries a `city.toml`, `pack.toml`, and an inert always-on
+`mayor` shell process. The mayor is a stable session bead for measuring idle
+runtime behavior without spending model tokens.
 
 ## Cost discipline
 
@@ -106,10 +128,7 @@ agent can reach `state=active` and a single bead can be slung.
   `[orders] skip = [...]` pattern).
 - Codex shim available for unit tests that don't need a live model.
 
-## How codex picks this up
-
-Codex sees this README + the report at gascity-nix and decides what to build
-first. The most useful first scenario for the open question:
+## Next scenario
 
 1. Pin canonical stock `v1.0.0`. Spin up minimal test city. Watch dolt for
    5 min. Capture: dolt CPU, dolt log warnings, events.jsonl growth, on-disk

@@ -23,13 +23,9 @@ to upstream/main (or wait for v1.0.1).
 
 ## Pin
 
-Same shape as the `canonical-stock` template, but with `gascity-nix`
-overridden to a `nix-fetch` of `github:gastownhall/gascity` at the chosen
-upstream/main commit.
-
-Codex: pick the upstream commit explicitly (don't use `branch=main` — that
-floats and breaks reproducibility). Document the chosen commit + date in
-this README.
+This template currently mirrors `canonical-stock` at the city-config layer.
+Wire a dedicated upstream-main package before running comparisons; pin an
+explicit commit, not a floating branch.
 
 ## Reproduction targets
 

@@ -1,0 +1,14 @@
+[pack]
+name = "test-upstream-main"
+schema = 2
+
+[[agent]]
+name = "mayor"
+start_command = "bash \"$GC_CITY/agents/mayor/run.sh\""
+prompt_mode = "none"
+process_names = ["bash", "sh"]
+max_active_sessions = 1
+
+[[named_session]]
+template = "mayor"
+mode = "always"
