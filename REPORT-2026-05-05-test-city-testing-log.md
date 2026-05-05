@@ -453,3 +453,167 @@ Planned shape:
   source-built setup gate.
 - Diagnose the prebuilt lane's Dolt start lock separately from the source lane;
   do not treat prebuilt failure as evidence about the dolt-amp bug yet.
+
+## 2026-05-06 00:36-00:37 CEST — fork issue-prefix candidate smoke
+
+Purpose: validate the first fork candidate that cherry-picks upstream's managed
+bd runtime config repair onto the `rebase-v1.0.0` fork line.
+
+Gas City source:
+
+```text
+LiGoldragon/gascity fix/bd-runtime-issue-prefix
+89b035f0d5a767668f6878d5229a46096f3cb2da
+```
+
+Test-city lane:
+
+```bash
+nix run .#run-idle-gascity-issue-prefix-source
+```
+
+Root:
+
+```text
+/tmp/test-city.BQsJfb
+```
+
+Observed:
+
+- Result was `observed`: setup passed and the short observation window
+  completed.
+- `session-list.final.json` showed active mayor session `tcs-7ov`.
+- `dolt-metrics.tsv` showed `issue_prefix=tcs` at every sample.
+- Commit count rose from 9 to 14 during startup and stayed at 14 over the
+  30-second smoke window.
+
+Artifacts:
+
+```text
+/tmp/test-city.BQsJfb/artifacts/
+```
+
+Result: setup PASS. This candidate clears the stock/gascity-nix
+`issue_prefix` blocker, but this short smoke was not enough to validate the
+five-minute dolt-amp behavior.
+
+## 2026-05-06 00:38-00:43 CEST — fork issue-prefix five-minute idle observation
+
+Purpose: run the same five-minute canonical-stock idle window against the
+issue-prefix-only fork candidate.
+
+Command:
+
+```bash
+KEEP_TEST_ROOT=1 \
+TEST_CITY_HEALTH_TIMEOUT_SECONDS=90 \
+TEST_CITY_OBSERVATION_SECONDS=300 \
+TEST_CITY_SAMPLE_INTERVAL_SECONDS=10 \
+nix run .#run-idle-gascity-issue-prefix-source
+```
+
+Root:
+
+```text
+/tmp/test-city.rkTpZP
+```
+
+Observed:
+
+- Result was `observed`: setup passed and the full observation window
+  completed.
+- Final session was active mayor session `tcs-s42`.
+- Direct SQL config table had `issue_prefix | tcs` and `types.custom`, so the
+  setup blocker was gone.
+- `dolt-metrics.tsv`:
+  - first sample: commit count 9 at `2026-05-05T22:38:46Z`;
+  - second sample: commit count 14 at `2026-05-05T22:38:57Z`;
+  - final sample: commit count 124 at `2026-05-05T22:43:46Z`.
+  - Stable-window commit delta after startup: +110.
+- `event-samples.tsv`:
+  - events rose from 5 to 11 during startup;
+  - final sample: 123 events at `2026-05-05T22:43:46Z`.
+  - Stable-window event delta after startup: +112.
+- `bd-trace.log` showed the repeating writer:
+  `bd update --json tcs-s42 --set-metadata quarantined_until= --set-metadata wake_attempts=0`
+  approximately every few seconds.
+
+Artifacts:
+
+```text
+/tmp/test-city.rkTpZP/artifacts/
+```
+
+Result: setup PASS, dolt-amp verdict FAIL. The missing `issue_prefix` was only
+the setup blocker; the runtime write amplification still reproduced on the
+fork when `clearWakeFailures` wrote already-clear metadata.
+
+## 2026-05-06 00:52-00:57 CEST — fork dolt-amp fix five-minute idle observation
+
+Purpose: validate the second fork candidate, which keeps the issue-prefix SQL
+repair and adds a dirty check to `clearWakeFailures` so stable sessions do not
+write already-clear `wake_attempts` / `quarantined_until` metadata.
+
+Gas City source:
+
+```text
+LiGoldragon/gascity fix/bd-runtime-issue-prefix
+6462edf36cefa88bde03f19439173a3bc821a708
+```
+
+Test-city lane:
+
+```bash
+nix run .#run-idle-gascity-dolt-amp-source
+```
+
+Command:
+
+```bash
+KEEP_TEST_ROOT=1 \
+TEST_CITY_HEALTH_TIMEOUT_SECONDS=90 \
+TEST_CITY_OBSERVATION_SECONDS=300 \
+TEST_CITY_SAMPLE_INTERVAL_SECONDS=10 \
+nix run .#run-idle-gascity-dolt-amp-source
+```
+
+Root:
+
+```text
+/tmp/test-city.lQ8bZD
+```
+
+Observed:
+
+- Result was `observed`: setup passed and the full observation window
+  completed.
+- Final session was active mayor session `tcs-1bx`.
+- Direct SQL config table had `issue_prefix | tcs` and `types.custom`.
+- `dolt-metrics.tsv`:
+  - first sample: commit count 9 at `2026-05-05T22:52:37Z`;
+  - second sample: commit count 14 at `2026-05-05T22:52:48Z`;
+  - final sample: commit count 14 at `2026-05-05T22:57:36Z`.
+  - Stable-window commit delta after startup: 0.
+- `event-samples.tsv`:
+  - events rose from 5 to 11 during startup;
+  - events rose once more to 12 at `2026-05-05T22:53:20Z`;
+  - final sample remained 12.
+  - Stable-window event delta after startup: +1, then flat for the rest of the
+    observation.
+- `dolt-processlist.tsv` and `connection-samples.tsv` showed no growing
+  connection set. The visible steady-state connections were the sampler's
+  `show processlist` query and short read-only bd polling.
+- `bd-trace.log` still showed read traffic (`bd list`, `bd ready`,
+  `bd show mayor` failures), but the repeating `bd update ... wake_attempts=0`
+  writer was gone during the observation. Only the expected shutdown writes
+  appeared after the runner stopped the supervisor.
+
+Artifacts:
+
+```text
+/tmp/test-city.lQ8bZD/artifacts/
+```
+
+Result: setup PASS, dolt-amp verdict PASS for this minimal always-on city. The
+controlled reproduction confirms the runtime commit/event growth in this
+harness comes from the stable-session `clearWakeFailures` no-op metadata write.

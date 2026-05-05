@@ -30,6 +30,28 @@ to commit` warnings firing at ~0.7/sec. Mayor's diagnosis ("clearWakeFailures
 is the load source") was at best partial; at worst it pointed at the wrong
 mechanism entirely. The second-half of the bug is **unresolved**.
 
+## Test-city follow-up — 2026-05-06
+
+The controlled `test-city` harness now reproduces and separates two issues:
+
+1. Stock source-built `v1.0.0` and the deployed `gascity-nix` pin do not pass
+   setup with current `bd 1.0.3` because managed bd init leaves the SQL
+   `config` table without `issue_prefix`. The YAML file has `issue_prefix`, but
+   `bd create` reads SQL config and fails.
+2. After the upstream `issue_prefix` SQL repair is cherry-picked onto the fork,
+   the minimal always-on city reaches a valid five-minute idle window and
+   reproduces Dolt write amplification: commits grow from 14 to 124 and events
+   from 11 to 123. `bd-trace.log` identifies the repeating write as
+   `bd update ... --set-metadata quarantined_until= --set-metadata wake_attempts=0`.
+
+A second fork candidate at
+`LiGoldragon/gascity 6462edf36cefa88bde03f19439173a3bc821a708` keeps the
+`issue_prefix` repair and dirty-checks `clearWakeFailures`. In the same
+five-minute harness, Dolt commits reach 14 after startup and remain 14 through
+the final sample; events reach 12 and remain flat. See
+`REPORT-2026-05-05-test-city-testing-log.md` for artifact roots and exact
+sample series.
+
 ## What was observed
 
 Pre-patch (Criopolis production city, supervisor on `gascity 76f46b45 = v1.0.0
