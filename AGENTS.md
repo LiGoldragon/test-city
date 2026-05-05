@@ -77,7 +77,7 @@ Default to:
 Reproduce the dolt write-amp pattern Criopolis hit on 2026-05-05.
 
 Full incident report at:
-`github.com/LiGoldragon/gascity-nix/REPORT-2026-05-05-dolt-amp-investigation.md`.
+`REPORT-2026-05-05-dolt-amp-investigation.md` (top-level of this repo).
 
 Read it. The discipline gap that made the report necessary — patch first,
 verify never — is exactly what this repo exists to prevent. So before

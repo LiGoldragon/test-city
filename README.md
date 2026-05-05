@@ -19,9 +19,8 @@ slow for the iterate-test-iterate loop). This README and the flake are the
 template; codex fills in the test scenarios.
 
 The full incident report — what was seen, what was tried, what's still
-unknown, what an honest investigator would check next — is at
-`github.com/LiGoldragon/gascity-nix` under `REPORT-2026-05-05-dolt-amp-investigation.md`.
-Read it first.
+unknown, what an honest investigator would check next — is in this repo at
+`REPORT-2026-05-05-dolt-amp-investigation.md`. Read it first.
 
 ## What this repo is for
 
