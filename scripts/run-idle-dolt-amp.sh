@@ -279,6 +279,36 @@ capture_setup_diagnostics() {
     >"$artifacts_dir/bd-config-list.stdout" 2>"$artifacts_dir/bd-config-list.stderr" || true
   run_isolated gc --city "$initialized_city" bd config get issue_prefix \
     >"$artifacts_dir/bd-config-get-issue-prefix.stdout" 2>"$artifacts_dir/bd-config-get-issue-prefix.stderr" || true
+  capture_dolt_config_table
+}
+
+capture_dolt_config_table() {
+  local metadata_path="$initialized_city/.beads/metadata.json"
+  local dolt_database="hq"
+  local state_path="$initialized_city/.gc/runtime/packs/dolt/dolt-provider-state.json"
+  local dolt_port=""
+
+  if [ -f "$metadata_path" ]; then
+    dolt_database="$(jq -r '.dolt_database // "hq"' "$metadata_path" 2>/dev/null || printf 'hq')"
+  fi
+  if [ -f "$state_path" ]; then
+    dolt_port="$(jq -r '.port // empty' "$state_path" 2>/dev/null || true)"
+  fi
+
+  if [ -n "$dolt_port" ]; then
+    dolt --host 127.0.0.1 --port "$dolt_port" --user root --password "" --no-tls \
+      sql -q "use \`$dolt_database\`; select * from config order by 1" \
+      >"$artifacts_dir/dolt-config-table.server.stdout" \
+      2>"$artifacts_dir/dolt-config-table.server.stderr" || true
+  fi
+
+  if [ -d "$initialized_city/.beads/dolt/$dolt_database" ]; then
+    (
+      cd "$initialized_city/.beads/dolt/$dolt_database"
+      dolt sql -q "select * from config order by 1"
+    ) >"$artifacts_dir/dolt-config-table.local.stdout" \
+      2>"$artifacts_dir/dolt-config-table.local.stderr" || true
+  fi
 }
 
 wait_for_session_health() {
