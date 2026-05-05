@@ -34,6 +34,7 @@
         sourceRoot = ./.;
         stockGascityCommit = "67c821c76f17226883e7153a324dadcfe80ec211";
         upstreamMainGascityCommit = "4be4d44be6df85b1c8b7f20c4afcc98fc1713dcc";
+        gascityNixPinnedCommit = "a720d067c0fcc9b77054222da5be6fac98091217";
         stockPrebuiltAssets = {
           x86_64-linux = {
             url = "https://github.com/gastownhall/gascity/releases/download/v1.0.0/gascity_1.0.0_linux_amd64.tar.gz";
@@ -212,6 +213,14 @@
           commit = upstreamMainGascityCommit;
           provenance = "source-built";
         };
+
+        runIdleGascityNixSource = mkIdleDoltAmpRunner {
+          name = "run-idle-gascity-nix-source";
+          gascityPackage = pkgs.gascity;
+          release = "gascity-nix";
+          commit = gascityNixPinnedCommit;
+          provenance = "source-built";
+        };
       in
       {
         devShells.default = pkgs.mkShell {
@@ -225,6 +234,7 @@
             echo "Run idle source: nix run .#run-idle-stock-source"
             echo "Run idle prebuilt: nix run .#run-idle-stock-prebuilt"
             echo "Run idle upstream main: nix run .#run-idle-upstream-main-source -- upstream-main"
+            echo "Run idle gascity-nix: nix run .#run-idle-gascity-nix-source"
             echo "Tear down: nix run .#tear-down -- /tmp/test-city..."
           '';
         };
@@ -240,6 +250,7 @@
           run-idle-stock-source = runIdleStockSource;
           run-idle-stock-prebuilt = runIdleStockPrebuilt;
           run-idle-upstream-main-source = runIdleUpstreamMainSource;
+          run-idle-gascity-nix-source = runIdleGascityNixSource;
         };
 
         apps = {
@@ -266,6 +277,10 @@
           run-idle-upstream-main-source = {
             type = "app";
             program = "${runIdleUpstreamMainSource}/bin/run-idle-upstream-main-source";
+          };
+          run-idle-gascity-nix-source = {
+            type = "app";
+            program = "${runIdleGascityNixSource}/bin/run-idle-gascity-nix-source";
           };
         };
       }
