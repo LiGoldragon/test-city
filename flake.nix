@@ -46,7 +46,7 @@
         upstreamMainGascityCommit = "4be4d44be6df85b1c8b7f20c4afcc98fc1713dcc";
         forkIssuePrefixGascityCommit = "89b035f0d5a767668f6878d5229a46096f3cb2da";
         forkDoltAmpGascityCommit = "6462edf36cefa88bde03f19439173a3bc821a708";
-        gascityNixPinnedCommit = "a720d067c0fcc9b77054222da5be6fac98091217";
+        gascityNixPinnedCommit = "6462edf36cefa88bde03f19439173a3bc821a708";
         stockPrebuiltAssets = {
           x86_64-linux = {
             url = "https://github.com/gastownhall/gascity/releases/download/v1.0.0/gascity_1.0.0_linux_amd64.tar.gz";
