@@ -1,9 +1,12 @@
 # Template: upstream-main
 
-Gas City at `gastownhall/gascity` `main` HEAD. As of 2026-05-05 that's
-`2a363e3b`, ~389 commits ahead of `v1.0.0`, including (at least) these
+Gas City at pinned `gastownhall/gascity` main-line commit
+`4be4d44be6df85b1c8b7f20c4afcc98fc1713dcc`, including (at least) these
 post-1.0.0 fixes that touch the same surface as Criopolis's dolt-amp bug:
 
+- `99c98750 fix: ensure beads.role, issue_prefix, and custom types on gc
+  init/start (#1295)` — replaces the stock `bd config set issue_prefix`
+  compatibility path with a direct bd SQL config-table upsert.
 - `b31fd6c5 fix: add respawn circuit breaker for named sessions (#563)` —
   may directly address the spawn-cycling pattern Criopolis hit.
 - `7c892b94 fix(session): honor pending create start lease (#1702)` —
@@ -23,9 +26,9 @@ to upstream/main (or wait for v1.0.1).
 
 ## Pin
 
-This template currently mirrors `canonical-stock` at the city-config layer.
-Wire a dedicated upstream-main package before running comparisons; pin an
-explicit commit, not a floating branch.
+This template mirrors `canonical-stock` at the city-config layer. The Nix
+runner is `nix run .#run-idle-upstream-main-source` and the flake pins the
+Gas City source commit explicitly, not through a floating branch.
 
 ## Reproduction targets
 

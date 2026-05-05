@@ -266,12 +266,18 @@ the forensic handoff; put every concrete test run, command shape, result, and
 artifact path in the testing log so the investigation has a single append-only
 operational record.
 
-Current status from test-city on 2026-05-05: the dolt-amp observation is blocked
-at setup for stock `v1.0.0`. The source-built lane initializes files but does
-not set `issue_prefix` in bd's database config, so session creation fails. The
-raw prebuilt lane is wired through a Nix fixed-output derivation, but currently
-fails earlier on Dolt start-lock acquisition. See the testing log for artifact
-paths and exact commands.
+Current status from test-city on 2026-05-06: stock source-built `v1.0.0` is
+blocked at setup by a bd compatibility regression. It pre-seeds
+`.beads/metadata.json`, skips `bd init`, then silently runs
+`bd config set issue_prefix`; current `bd 1.0.3` rejects that protected key, so
+the Dolt SQL `config` table lacks `issue_prefix` and `bd create` fails. A
+targeted SQL repair of only `issue_prefix = tcs` unblocked mayor session bead
+creation in the scratch root. Pinned upstream-main Gas City
+`4be4d44be6df85b1c8b7f20c4afcc98fc1713dcc` passes the same short harness and
+writes `issue_prefix` into the SQL config table. The raw prebuilt `v1.0.0` lane
+is wired through a Nix fixed-output derivation, but currently fails earlier on
+Dolt start-lock acquisition. See the testing log for artifact paths and exact
+commands.
 
 Cost discipline for test-city: `gpt-5.4-mini` + `model_reasoning_effort=low`,
 short test windows, single-agent test cities unless a scenario specifically

@@ -26,6 +26,10 @@ file records what test-city actually runs.
   CriomOS packaging compatibility requirement.
 - source-built lane: `nix run .#run-idle-stock-source`
 - upstream-prebuilt lane: `nix run .#run-idle-stock-prebuilt`
+- upstream-main source lane:
+  `nix run .#run-idle-upstream-main-source`
+- upstream-main source commit:
+  `4be4d44be6df85b1c8b7f20c4afcc98fc1713dcc`
 - prebuilt fixed-output asset:
   `gascity_1.0.0_linux_amd64.tar.gz`,
   `sha256-zEXmvlTGuwD+aRWCn4vquyWlhbYEpHhGhFqnuacDcNM=`
@@ -214,17 +218,140 @@ means the prebuilt lane is useful, but it first needs its own start-lock
 diagnosis before it can isolate "Nix source build changed behavior" from the
 dolt-amp bug.
 
-## Next run — unblock stock-v1.0.0 setup
+## 2026-05-06 00:08 CEST — stock source lane with SQL config capture
+
+Purpose: rerun stock upstream Gas City `v1.0.0` after adding direct Dolt SQL
+`config` table capture to setup-failure diagnostics.
+
+Command:
+
+```bash
+KEEP_TEST_ROOT=1 \
+TEST_CITY_HEALTH_TIMEOUT_SECONDS=10 \
+TEST_CITY_OBSERVATION_SECONDS=15 \
+TEST_CITY_SAMPLE_INTERVAL_SECONDS=5 \
+nix run .#run-idle-stock-source
+```
+
+Root:
+
+```text
+/tmp/test-city.8HFnM3
+```
+
+Observed:
+
+- Result remained `setup-failed`: no sessions became visible.
+- `dolt-config-table.server.stdout` and `dolt-config-table.local.stdout` both
+  showed `types.custom` but no `issue_prefix`.
+- `.beads/config.yaml` still contained `issue_prefix: tcs` and
+  `issue-prefix: tcs`, so the YAML compatibility file is not the state read by
+  `bd create`.
+- `bd-trace.log` showed no `bd init` invocation during the failure window.
+- Source inspection of `v1.0.0` found the compatibility problem:
+  `gc-beads-bd.sh` takes a metadata fast path when `.beads/metadata.json`
+  exists, skips `bd init`, then runs
+  `bd config set issue_prefix "$prefix" 2>/dev/null || true`. Current
+  `bd 1.0.3` rejects protected `issue_prefix` writes through `bd config set`,
+  so the script silently leaves the SQL config table without `issue_prefix`.
+
+Artifacts:
+
+```text
+/tmp/test-city.8HFnM3/artifacts/
+```
+
+Result: setup FAIL, bug verdict BLOCKER IDENTIFIED. Stock source-built
+`v1.0.0` is incompatible with current `bd` for metadata-preseeded managed
+Dolt scopes.
+
+## 2026-05-06 00:09-00:10 CEST — issue_prefix repair probe
+
+Purpose: prove the missing SQL `issue_prefix` row is sufficient to explain the
+stock source-lane setup failure.
+
+Root:
+
+```text
+/tmp/test-city.8HFnM3
+```
+
+Action:
+
+- Inserted only `('issue_prefix', 'tcs')` into
+  `/tmp/test-city.8HFnM3/initialized-city/.beads/dolt/hq` table `config`.
+- Restarted the isolated supervisor path and ran `gc start` against the same
+  scratch city.
+
+Observed:
+
+- `repair-check-issue-prefix.stdout` showed `issue_prefix | tcs`.
+- After the repair, `bd create ... mayor ...` succeeded in
+  `repair-bd-trace.log`; before the repair the same operation failed with
+  `database not initialized: issue_prefix config is missing`.
+- `repair-session-list.json` showed a created mayor session bead `tcs-3xw`.
+- This was not counted as a valid dolt-amp run because the root was manually
+  mutated and then stopped during cleanup; it was a targeted causality probe.
+
+Result: PROBE PASS. Missing SQL `issue_prefix` is the immediate blocker for
+stock `v1.0.0` setup with current `bd`.
+
+## 2026-05-06 00:15-00:16 CEST — upstream-main source lane smoke
+
+Purpose: compare the same isolated city shape against pinned upstream-main
+Gas City, which includes the post-`v1.0.0` bd runtime config fix.
+
+Command:
+
+```bash
+KEEP_TEST_ROOT=1 \
+TEST_CITY_HEALTH_TIMEOUT_SECONDS=20 \
+TEST_CITY_OBSERVATION_SECONDS=15 \
+TEST_CITY_SAMPLE_INTERVAL_SECONDS=5 \
+nix run .#run-idle-upstream-main-source
+```
+
+Root:
+
+```text
+/tmp/test-city.bHQkmc
+```
+
+Observed:
+
+- Result was `observed`: the session health gate passed and the short
+  observation window completed.
+- `session-list.final.json` showed active mayor session `tum-zrd`.
+- Direct SQL config check showed `issue_prefix | tum` and `types.custom` in the
+  `hq` config table.
+- `bd-trace.log` showed `bd create ... mayor ...` succeeded in about 885 ms.
+- Short-window samples:
+  - `event-samples.tsv`: event lines rose from 5 to 10, then stayed at 10.
+  - `.beads` size rose from about 526 KiB to 595 KiB, then flattened over the
+    remaining sample.
+  - one Dolt listener was present on the managed test-root port.
+
+Artifacts:
+
+```text
+/tmp/test-city.bHQkmc/artifacts/
+```
+
+Result: setup PASS, short observation PASS. This does not yet characterize the
+original five-minute dolt write-amp bug, but it proves the pinned upstream-main
+lane clears the `issue_prefix` setup blocker that invalidates stock `v1.0.0`.
+
+## Next run — characterize idle write amplification
 
 Planned shape:
 
-- Determine whether stock `v1.0.0` is expected to write `issue_prefix` into the
-  bd database config table during `gc init`, or whether it only writes the
-  compatibility `.beads/config.yaml` file.
-- If stock `v1.0.0` cannot create sessions with current bd, record that as a
-  separate setup regression and add a clearly named compatibility scenario
-  before attempting dolt-amp reproduction.
+- Run the upstream-main lane for the full five-minute default window now that
+  it passes setup.
+- Add Dolt commit-count/processlist sampling before declaring any dolt-amp
+  verdict; current samples cover process, lsof, events, and size only.
+- Add a Li fork / `gascity-nix` lane. The current `gascity-nix` pin
+  (`a720d067`) still has the stock `bd config set issue_prefix` path, so it is
+  expected to reproduce the setup blocker unless the pin is advanced or
+  patched.
 - Diagnose the prebuilt lane's Dolt start lock separately from the source lane;
   do not treat prebuilt failure as evidence about the dolt-amp bug yet.
-- Only run the five-minute dolt-amp observation after the runner health gate
-  sees at least one session bead.
