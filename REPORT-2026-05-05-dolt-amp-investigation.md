@@ -255,7 +255,10 @@ First scenario for codex to run: spawn the canonical-stock template (gascity
 v1.0.0 with no fork patches), watch dolt for 5 min idle, see if the amp
 reproduces. If it does, the bug is upstream and we file the issue with a
 clean reproducer. If it doesn't, the bug is specific to Criopolis's
-configuration or our fork patches and we bisect.
+configuration or our fork patches and we bisect. Keep the source-built
+`v1.0.0` runner and the upstream-prebuilt `v1.0.0` runner separate; the
+prebuilt lane should enter Nix as a fixed-output derivation so binary-provenance
+comparisons still run with `nix run`.
 
 Active run notes now live in
 `REPORT-2026-05-05-test-city-testing-log.md`. Keep this incident report as
