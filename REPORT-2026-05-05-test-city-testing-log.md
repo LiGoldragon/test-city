@@ -399,13 +399,57 @@ Artifacts:
 Result: upstream-main idle dolt-amp verdict PASS for this minimal always-on
 city. It does not reproduce the Criopolis idle write amplification pattern.
 
-## Next run — compare the deployed fork pin
+## 2026-05-06 00:28 CEST — gascity-nix fork pin setup smoke
+
+Purpose: test the currently deployed `gascity-nix` pin lineage under the same
+minimal source-built lane. This is the `1.0.0-codex-2026-05-05` build from
+Gas City commit `a720d067c0fcc9b77054222da5be6fac98091217`.
+
+Command:
+
+```bash
+KEEP_TEST_ROOT=1 \
+TEST_CITY_HEALTH_TIMEOUT_SECONDS=15 \
+TEST_CITY_OBSERVATION_SECONDS=30 \
+TEST_CITY_SAMPLE_INTERVAL_SECONDS=10 \
+nix run .#run-idle-gascity-nix-source
+```
+
+Root:
+
+```text
+/tmp/test-city.8Zto9z
+```
+
+Observed:
+
+- Result was `setup-failed`: no sessions became visible.
+- Gas City binary:
+  `/nix/store/gbbnf94h92vx5wm2q2whd67h6hblc30y-gascity-1.0.0-codex-2026-05-05/bin/gc`.
+- `dolt-config-table.server.stdout` showed `types.custom` but no
+  `issue_prefix`.
+- `bd-config-get-issue-prefix.stdout` reported `issue_prefix (not set)`.
+- `.beads/config.yaml` contained `issue_prefix: tcs` and `issue-prefix: tcs`.
+- `bd create ... mayor ...` failed with
+  `database not initialized: issue_prefix config is missing`.
+
+Artifacts:
+
+```text
+/tmp/test-city.8Zto9z/artifacts/
+```
+
+Result: setup FAIL. The deployed fork pin has the same current-`bd`
+compatibility blocker as stock `v1.0.0`; the post-`v1.0.0` upstream-main
+`issue_prefix` SQL upsert fix is not present in this pin.
+
+## Next run — patch fork or advance pin
 
 Planned shape:
 
-- Add a Li fork / `gascity-nix` lane. The current `gascity-nix` pin
-  (`a720d067`) still has the stock `bd config set issue_prefix` path, so it is
-  expected to reproduce the setup blocker unless the pin is advanced or
-  patched.
+- Patch `LiGoldragon/gascity` or advance the fork pin so managed bd init writes
+  `issue_prefix` into the SQL config table without using `bd config set`.
+- After a fork fix exists, add a Nix lane for the fix candidate and rerun the
+  source-built setup gate.
 - Diagnose the prebuilt lane's Dolt start lock separately from the source lane;
   do not treat prebuilt failure as evidence about the dolt-amp bug yet.
