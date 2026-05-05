@@ -603,6 +603,8 @@ Observed:
 - `dolt-processlist.tsv` and `connection-samples.tsv` showed no growing
   connection set. The visible steady-state connections were the sampler's
   `show processlist` query and short read-only bd polling.
+- Dolt process `%CPU` in `process-samples.tsv` decayed from 23.7% at the first
+  sample to 3.1% at the final sample. Average over sampled lines was 6.61%.
 - `bd-trace.log` still showed read traffic (`bd list`, `bd ready`,
   `bd show mayor` failures), but the repeating `bd update ... wake_attempts=0`
   writer was gone during the observation. Only the expected shutdown writes
