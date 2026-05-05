@@ -1,0 +1,13 @@
+result
+result-*
+.direnv/
+.envrc.local
+*.swp
+*.swo
+__pycache__/
+*.pyc
+
+# Test scratch roots — should never be committed; tests always tear down or
+# preserve via KEEP_TEST_ROOT=1 in /tmp.
+test-roots/
+.test-roots/
