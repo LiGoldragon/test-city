@@ -20,6 +20,11 @@
       flake = false;
     };
 
+    gascity-fork-dolt-amp = {
+      url = "github:LiGoldragon/gascity/6462edf36cefa88bde03f19439173a3bc821a708";
+      flake = false;
+    };
+
     # Kept available for later fork/upstream comparison apps. The default
     # runner below uses the direct stock v1.0.0 input.
     gascity-nix = {
@@ -28,7 +33,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, gascity-nix, gascity-v1-0, gascity-upstream-main, gascity-fork-issue-prefix, ... }:
+  outputs = { self, nixpkgs, flake-utils, gascity-nix, gascity-v1-0, gascity-upstream-main, gascity-fork-issue-prefix, gascity-fork-dolt-amp, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -40,6 +45,7 @@
         stockGascityCommit = "67c821c76f17226883e7153a324dadcfe80ec211";
         upstreamMainGascityCommit = "4be4d44be6df85b1c8b7f20c4afcc98fc1713dcc";
         forkIssuePrefixGascityCommit = "89b035f0d5a767668f6878d5229a46096f3cb2da";
+        forkDoltAmpGascityCommit = "6462edf36cefa88bde03f19439173a3bc821a708";
         gascityNixPinnedCommit = "a720d067c0fcc9b77054222da5be6fac98091217";
         stockPrebuiltAssets = {
           x86_64-linux = {
@@ -110,6 +116,12 @@
           version = "1.0.0-fork-issue-prefix-2026-05-06";
           commit = forkIssuePrefixGascityCommit;
           source = gascity-fork-issue-prefix;
+        };
+
+        gascityForkDoltAmp = mkGascity {
+          version = "1.0.0-fork-dolt-amp-2026-05-06";
+          commit = forkDoltAmpGascityCommit;
+          source = gascity-fork-dolt-amp;
         };
 
         gascityStockV1Prebuilt =
@@ -241,6 +253,14 @@
           commit = forkIssuePrefixGascityCommit;
           provenance = "source-built";
         };
+
+        runIdleGascityDoltAmpSource = mkIdleDoltAmpRunner {
+          name = "run-idle-gascity-dolt-amp-source";
+          gascityPackage = gascityForkDoltAmp;
+          release = "gascity-dolt-amp-fix";
+          commit = forkDoltAmpGascityCommit;
+          provenance = "source-built";
+        };
       in
       {
         devShells.default = pkgs.mkShell {
@@ -256,6 +276,7 @@
             echo "Run idle upstream main: nix run .#run-idle-upstream-main-source -- upstream-main"
             echo "Run idle gascity-nix: nix run .#run-idle-gascity-nix-source"
             echo "Run idle gascity issue-prefix fix: nix run .#run-idle-gascity-issue-prefix-source"
+            echo "Run idle gascity dolt-amp fix: nix run .#run-idle-gascity-dolt-amp-source"
             echo "Tear down: nix run .#tear-down -- /tmp/test-city..."
           '';
         };
@@ -268,12 +289,14 @@
           gascity-stock-v1-0-prebuilt = gascityStockV1Prebuilt;
           gascity-upstream-main = gascityUpstreamMain;
           gascity-issue-prefix-fix = gascityForkIssuePrefix;
+          gascity-dolt-amp-fix = gascityForkDoltAmp;
           gascity-current-fork = pkgs.gascity;
           run-idle-stock-source = runIdleStockSource;
           run-idle-stock-prebuilt = runIdleStockPrebuilt;
           run-idle-upstream-main-source = runIdleUpstreamMainSource;
           run-idle-gascity-nix-source = runIdleGascityNixSource;
           run-idle-gascity-issue-prefix-source = runIdleGascityIssuePrefixSource;
+          run-idle-gascity-dolt-amp-source = runIdleGascityDoltAmpSource;
         };
 
         apps = {
@@ -308,6 +331,10 @@
           run-idle-gascity-issue-prefix-source = {
             type = "app";
             program = "${runIdleGascityIssuePrefixSource}/bin/run-idle-gascity-issue-prefix-source";
+          };
+          run-idle-gascity-dolt-amp-source = {
+            type = "app";
+            program = "${runIdleGascityDoltAmpSource}/bin/run-idle-gascity-dolt-amp-source";
           };
         };
       }
