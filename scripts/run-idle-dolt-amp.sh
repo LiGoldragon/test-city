@@ -330,6 +330,58 @@ read_dolt_port() {
   jq -r '.port // empty' "$state_file" 2>/dev/null || true
 }
 
+read_dolt_database() {
+  local metadata_file="$initialized_city/.beads/metadata.json"
+  if [ -f "$metadata_file" ]; then
+    jq -r '.dolt_database // "hq"' "$metadata_file" 2>/dev/null || printf 'hq'
+    return 0
+  fi
+  printf 'hq'
+}
+
+valid_dolt_database_name() {
+  case "$1" in
+    "" | *[!A-Za-z0-9_-]*)
+      return 1
+      ;;
+  esac
+}
+
+query_dolt_csv_value() {
+  local port="$1"
+  local database="$2"
+  local query="$3"
+  dolt --host 127.0.0.1 --port "$port" --user root --password "" --no-tls \
+    sql -r csv -q "use \`$database\`; $query" 2>/dev/null \
+    | awk 'NR == 2 {print; exit}'
+}
+
+sample_dolt_sql() {
+  local timestamp="$1"
+  local port="$2"
+  local database
+  local commit_count=""
+  local working_changes=""
+  local issue_prefix=""
+  local processlist_tmp="$artifacts_dir/dolt-processlist.current.csv"
+
+  database="$(read_dolt_database)"
+  valid_dolt_database_name "$database" || return 0
+
+  commit_count="$(query_dolt_csv_value "$port" "$database" "select count(*) as commit_count from dolt_log" || true)"
+  working_changes="$(query_dolt_csv_value "$port" "$database" "select count(*) as working_changes from dolt_status" || true)"
+  issue_prefix="$(query_dolt_csv_value "$port" "$database" "select value from config where \`key\` = 'issue_prefix'" || true)"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$timestamp" "$port" "$database" "$commit_count" "$working_changes" "$issue_prefix" \
+    >>"$artifacts_dir/dolt-metrics.tsv"
+
+  if dolt --host 127.0.0.1 --port "$port" --user root --password "" --no-tls \
+    sql -r csv -q "show processlist" >"$processlist_tmp" 2>>"$artifacts_dir/dolt-processlist.stderr"; then
+    awk -v ts="$timestamp" -v port="$port" 'NR > 1 {print ts "\t" port "\t" $0}' "$processlist_tmp" \
+      >>"$artifacts_dir/dolt-processlist.tsv"
+  fi
+}
+
 sample_once() {
   local timestamp="$1"
   local event_lines=0
@@ -366,6 +418,7 @@ sample_once() {
     lsof -nP -iTCP:"$dolt_port" 2>/dev/null \
       | awk -v ts="$timestamp" -v port="$dolt_port" 'NR > 1 {print ts "\t" port "\t" $0}' \
       >>"$artifacts_dir/connection-samples.tsv" || true
+    sample_dolt_sql "$timestamp" "$dolt_port"
   fi
 
   if run_isolated gc --city "$initialized_city" session list --state all --json >"$session_tmp" 2>>"$artifacts_dir/session-samples.stderr"; then
@@ -379,6 +432,9 @@ write_headers() {
   printf 'timestamp\tevents_lines\tdolt_log_warnings\n' >"$artifacts_dir/event-samples.tsv"
   printf 'timestamp\tpath\tbytes\n' >"$artifacts_dir/size-samples.tsv"
   printf 'timestamp\tport\tlsof_line\n' >"$artifacts_dir/connection-samples.tsv"
+  printf 'timestamp\tport\tdatabase\tcommit_count\tworking_changes\tissue_prefix\n' >"$artifacts_dir/dolt-metrics.tsv"
+  printf 'timestamp\tport\tprocesslist_csv_line\n' >"$artifacts_dir/dolt-processlist.tsv"
+  : >"$artifacts_dir/dolt-processlist.stderr"
   : >"$artifacts_dir/session-samples.jsonl"
   : >"$artifacts_dir/session-samples.stderr"
 }
