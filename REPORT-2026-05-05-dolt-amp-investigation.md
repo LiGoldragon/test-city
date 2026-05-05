@@ -50,7 +50,9 @@ A second fork candidate at
 five-minute harness, Dolt commits reach 14 after startup and remain 14 through
 the final sample; events reach 12 and remain flat. See
 `REPORT-2026-05-05-test-city-testing-log.md` for artifact roots and exact
-sample series.
+sample series. The updated `LiGoldragon/gascity-nix` package pin at
+`db668627ca3293c45778390ecf1b193c74607246` was also validated through the same
+five-minute lane with the same flat commit/event result.
 
 ## What was observed
 
