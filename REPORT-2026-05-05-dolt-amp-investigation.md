@@ -257,6 +257,12 @@ reproduces. If it does, the bug is upstream and we file the issue with a
 clean reproducer. If it doesn't, the bug is specific to Criopolis's
 configuration or our fork patches and we bisect.
 
+Active run notes now live in
+`REPORT-2026-05-05-test-city-testing-log.md`. Keep this incident report as
+the forensic handoff; put every concrete test run, command shape, result, and
+artifact path in the testing log so the investigation has a single append-only
+operational record.
+
 Cost discipline for test-city: `gpt-5.4-mini` + `model_reasoning_effort=low`,
 short test windows, single-agent test cities unless a scenario specifically
 needs more.
