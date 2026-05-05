@@ -19,6 +19,8 @@ file records what test-city actually runs.
 - test-city commit: `d35d6528` (`add idle dolt amp runners`)
 - default package: stock upstream Gas City `v1.0.0`
 - stock source commit: `67c821c76f17226883e7153a324dadcfe80ec211`
+- runtime dependencies in the Nix shell: `bd version 1.0.3 (dev)`,
+  `dolt version 1.86.2`
 - packaging note: the Nix package rewrites embedded `examples/*.sh`
   `#!/bin/sh` shebangs to bash before Go embedding, matching the known
   CriomOS packaging compatibility requirement.
