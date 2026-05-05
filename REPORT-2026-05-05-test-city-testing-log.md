@@ -341,14 +341,68 @@ Result: setup PASS, short observation PASS. This does not yet characterize the
 original five-minute dolt write-amp bug, but it proves the pinned upstream-main
 lane clears the `issue_prefix` setup blocker that invalidates stock `v1.0.0`.
 
-## Next run — characterize idle write amplification
+## 2026-05-06 00:20-00:25 CEST — upstream-main five-minute idle observation
+
+Purpose: run the first valid five-minute idle dolt-amp window after adding
+direct Dolt SQL commit-count and processlist sampling.
+
+Command:
+
+```bash
+KEEP_TEST_ROOT=1 \
+TEST_CITY_HEALTH_TIMEOUT_SECONDS=30 \
+TEST_CITY_OBSERVATION_SECONDS=300 \
+TEST_CITY_SAMPLE_INTERVAL_SECONDS=10 \
+nix run .#run-idle-upstream-main-source
+```
+
+Root:
+
+```text
+/tmp/test-city.qHzB2c
+```
+
+Observed:
+
+- Result was `observed`: setup passed and the full observation window
+  completed.
+- `session-list.final.json` showed active mayor session `tum-2ir`.
+- `dolt-metrics.tsv`:
+  - first sample: commit count 8 at `2026-05-05T22:20:16Z`;
+  - second sample: commit count 12 at `2026-05-05T22:20:26Z`;
+  - final sample: commit count 12 at `2026-05-05T22:25:06Z`.
+  - Stable-window commit delta after startup: 0.
+- `event-samples.tsv`:
+  - events rose from 5 to 10 during startup;
+  - events remained 10 from the second sample through the final sample.
+  - Stable-window event delta after startup: 0.
+- `size-samples.tsv`:
+  - `.beads` grew from 525,427 bytes to 618,720 bytes during startup, then to
+    619,688 bytes by the final sample.
+  - Stable-window `.beads` delta after startup: 968 bytes.
+  - `.gc` grew from 517,787 bytes to 617,400 bytes; most of this is runtime
+    log/artifact churn, not Dolt commits.
+- `dolt-processlist.tsv` showed only the sampler's own `show processlist`
+  query at each sample, not a growing connection set.
+- Dolt process `%CPU` in `process-samples.tsv` decayed from 20.0% at the first
+  sample to 2.8% at the final sample. Average over sampled lines was 6.04%.
+- `dolt.log` contained startup/schema/idempotent `nothing to commit` warnings
+  and one transient serialization failure. The failed `state=awake` update was
+  retried successfully in `bd-trace.log`.
+
+Artifacts:
+
+```text
+/tmp/test-city.qHzB2c/artifacts/
+```
+
+Result: upstream-main idle dolt-amp verdict PASS for this minimal always-on
+city. It does not reproduce the Criopolis idle write amplification pattern.
+
+## Next run — compare the deployed fork pin
 
 Planned shape:
 
-- Run the upstream-main lane for the full five-minute default window now that
-  it passes setup.
-- Add Dolt commit-count/processlist sampling before declaring any dolt-amp
-  verdict; current samples cover process, lsof, events, and size only.
 - Add a Li fork / `gascity-nix` lane. The current `gascity-nix` pin
   (`a720d067`) still has the stock `bd config set issue_prefix` path, so it is
   expected to reproduce the setup blocker unless the pin is advanced or
