@@ -15,6 +15,11 @@
       flake = false;
     };
 
+    gascity-fork-issue-prefix = {
+      url = "github:LiGoldragon/gascity/89b035f0d5a767668f6878d5229a46096f3cb2da";
+      flake = false;
+    };
+
     # Kept available for later fork/upstream comparison apps. The default
     # runner below uses the direct stock v1.0.0 input.
     gascity-nix = {
@@ -23,7 +28,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, gascity-nix, gascity-v1-0, gascity-upstream-main, ... }:
+  outputs = { self, nixpkgs, flake-utils, gascity-nix, gascity-v1-0, gascity-upstream-main, gascity-fork-issue-prefix, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -34,6 +39,7 @@
         sourceRoot = ./.;
         stockGascityCommit = "67c821c76f17226883e7153a324dadcfe80ec211";
         upstreamMainGascityCommit = "4be4d44be6df85b1c8b7f20c4afcc98fc1713dcc";
+        forkIssuePrefixGascityCommit = "89b035f0d5a767668f6878d5229a46096f3cb2da";
         gascityNixPinnedCommit = "a720d067c0fcc9b77054222da5be6fac98091217";
         stockPrebuiltAssets = {
           x86_64-linux = {
@@ -98,6 +104,12 @@
           version = "1.0.0-upstream-main-2026-05-05";
           commit = upstreamMainGascityCommit;
           source = gascity-upstream-main;
+        };
+
+        gascityForkIssuePrefix = mkGascity {
+          version = "1.0.0-fork-issue-prefix-2026-05-06";
+          commit = forkIssuePrefixGascityCommit;
+          source = gascity-fork-issue-prefix;
         };
 
         gascityStockV1Prebuilt =
@@ -221,6 +233,14 @@
           commit = gascityNixPinnedCommit;
           provenance = "source-built";
         };
+
+        runIdleGascityIssuePrefixSource = mkIdleDoltAmpRunner {
+          name = "run-idle-gascity-issue-prefix-source";
+          gascityPackage = gascityForkIssuePrefix;
+          release = "gascity-issue-prefix-fix";
+          commit = forkIssuePrefixGascityCommit;
+          provenance = "source-built";
+        };
       in
       {
         devShells.default = pkgs.mkShell {
@@ -235,6 +255,7 @@
             echo "Run idle prebuilt: nix run .#run-idle-stock-prebuilt"
             echo "Run idle upstream main: nix run .#run-idle-upstream-main-source -- upstream-main"
             echo "Run idle gascity-nix: nix run .#run-idle-gascity-nix-source"
+            echo "Run idle gascity issue-prefix fix: nix run .#run-idle-gascity-issue-prefix-source"
             echo "Tear down: nix run .#tear-down -- /tmp/test-city..."
           '';
         };
@@ -246,11 +267,13 @@
           gascity-stock-v1-0 = gascityStockV1;
           gascity-stock-v1-0-prebuilt = gascityStockV1Prebuilt;
           gascity-upstream-main = gascityUpstreamMain;
+          gascity-issue-prefix-fix = gascityForkIssuePrefix;
           gascity-current-fork = pkgs.gascity;
           run-idle-stock-source = runIdleStockSource;
           run-idle-stock-prebuilt = runIdleStockPrebuilt;
           run-idle-upstream-main-source = runIdleUpstreamMainSource;
           run-idle-gascity-nix-source = runIdleGascityNixSource;
+          run-idle-gascity-issue-prefix-source = runIdleGascityIssuePrefixSource;
         };
 
         apps = {
@@ -281,6 +304,10 @@
           run-idle-gascity-nix-source = {
             type = "app";
             program = "${runIdleGascityNixSource}/bin/run-idle-gascity-nix-source";
+          };
+          run-idle-gascity-issue-prefix-source = {
+            type = "app";
+            program = "${runIdleGascityIssuePrefixSource}/bin/run-idle-gascity-issue-prefix-source";
           };
         };
       }

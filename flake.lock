@@ -36,6 +36,23 @@
         "type": "github"
       }
     },
+    "gascity-fork-issue-prefix": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1778020280,
+        "narHash": "sha256-cAvbtNquGgmhh1CPrUfTQlG3+6HzwiOI3CCKyNqOiuU=",
+        "owner": "LiGoldragon",
+        "repo": "gascity",
+        "rev": "89b035f0d5a767668f6878d5229a46096f3cb2da",
+        "type": "github"
+      },
+      "original": {
+        "owner": "LiGoldragon",
+        "repo": "gascity",
+        "rev": "89b035f0d5a767668f6878d5229a46096f3cb2da",
+        "type": "github"
+      }
+    },
     "gascity-nix": {
       "inputs": {
         "flake-utils": "flake-utils_2",
@@ -110,6 +127,7 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
+        "gascity-fork-issue-prefix": "gascity-fork-issue-prefix",
         "gascity-nix": "gascity-nix",
         "gascity-upstream-main": "gascity-upstream-main",
         "gascity-v1-0": "gascity-v1-0",
