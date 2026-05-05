@@ -619,3 +619,62 @@ Artifacts:
 Result: setup PASS, dolt-amp verdict PASS for this minimal always-on city. The
 controlled reproduction confirms the runtime commit/event growth in this
 harness comes from the stable-session `clearWakeFailures` no-op metadata write.
+
+## 2026-05-06 01:06-01:11 CEST — updated gascity-nix five-minute idle observation
+
+Purpose: validate the actual `LiGoldragon/gascity-nix` package pin after moving
+that flake to Gas City `6462edf36cefa88bde03f19439173a3bc821a708`.
+
+Packaging source:
+
+```text
+LiGoldragon/gascity-nix
+db668627ca3293c45778390ecf1b193c74607246
+```
+
+Command:
+
+```bash
+KEEP_TEST_ROOT=1 \
+TEST_CITY_HEALTH_TIMEOUT_SECONDS=90 \
+TEST_CITY_OBSERVATION_SECONDS=300 \
+TEST_CITY_SAMPLE_INTERVAL_SECONDS=10 \
+nix run .#run-idle-gascity-nix-source
+```
+
+Root:
+
+```text
+/tmp/test-city.6IBO5c
+```
+
+Observed:
+
+- Result was `observed`: setup passed and the full observation window
+  completed.
+- Binary:
+  `/nix/store/ily36gwx8fyrnkzbx61vdv3zl5gqprq7-gascity-1.0.0-codex-2026-05-06/bin/gc`.
+- Final session was active mayor session `tcs-chq`.
+- Direct SQL config table had `issue_prefix | tcs` and `types.custom`.
+- `dolt-metrics.tsv`:
+  - first sample: commit count 9 at `2026-05-05T23:06:29Z`;
+  - second sample: commit count 14 at `2026-05-05T23:06:40Z`;
+  - final sample: commit count 14 at `2026-05-05T23:11:28Z`.
+  - Stable-window commit delta after startup: 0.
+- `event-samples.tsv`:
+  - events rose from 5 to 11 during startup;
+  - events rose once more to 12 at `2026-05-05T23:07:12Z`;
+  - final sample remained 12.
+- Dolt process `%CPU` in `process-samples.tsv` decayed from 23.4% at the first
+  sample to 3.1% at the final sample. Average over sampled lines was 6.63%.
+- `dolt-processlist.tsv` showed only sampler/read traffic in the steady-state
+  tail. Shutdown wrote `state=suspended` and `suspended_at` after the
+  observation window, as expected.
+
+Artifacts:
+
+```text
+/tmp/test-city.6IBO5c/artifacts/
+```
+
+Result: updated `gascity-nix` verdict PASS for this minimal always-on city.
