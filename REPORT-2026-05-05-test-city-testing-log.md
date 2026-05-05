@@ -16,15 +16,26 @@ file records what test-city actually runs.
 
 ## Current infrastructure baseline
 
-- test-city commit: `00b8f55b` (`nix prepare stock city`)
+- test-city commit: `d35d6528` (`add idle dolt amp runners`)
 - default package: stock upstream Gas City `v1.0.0`
 - stock source commit: `67c821c76f17226883e7153a324dadcfe80ec211`
 - packaging note: the Nix package rewrites embedded `examples/*.sh`
   `#!/bin/sh` shebangs to bash before Go embedding, matching the known
   CriomOS packaging compatibility requirement.
-- binary lanes: keep source-built and upstream-prebuilt tests as separate Nix
-  apps. The prebuilt lane should fetch the release binary through a fixed-output
-  derivation so both lanes stay fully wired through `nix run`.
+- source-built lane: `nix run .#run-idle-stock-source`
+- upstream-prebuilt lane: `nix run .#run-idle-stock-prebuilt`
+- prebuilt fixed-output asset:
+  `gascity_1.0.0_linux_amd64.tar.gz`,
+  `sha256-zEXmvlTGuwD+aRWCn4vquyWlhbYEpHhGhFqnuacDcNM=`
+- runner scripts: `scripts/run-idle-stock-source.sh` and
+  `scripts/run-idle-stock-prebuilt.sh` call the shared
+  `scripts/run-idle-dolt-amp.sh` harness.
+- isolation: `GC_HOME`, `XDG_RUNTIME_DIR`, `TMPDIR`, `DOLT_ROOT_PATH`, and
+  `GIT_CONFIG_GLOBAL` live under the test root; `HOME` remains the real user
+  home because Gas City rejects platform-supervisor operations when `HOME` is
+  rewritten.
+- cleanup: the runner asks the isolated supervisor to stop, then terminates any
+  remaining process whose command line contains the test root.
 - template: `templates/canonical-stock`
 - live model usage: none; the mayor template is an inert shell process.
 
@@ -100,22 +111,118 @@ host service-manager noise, capture only test-root processes, and add an
 explicit health gate for bd-backed session creation before counting a run as a
 dolt-amp test.
 
-## Next run — stock-v1.0.0 idle dolt amp
+## 2026-05-05 23:51 CEST — runner validation note
+
+The first scripted source-lane smoke used a fully synthetic `HOME` and failed
+`gc init` because Gas City requires the real user home for platform-supervisor
+operations. That was a harness bug, not a Gas City result. The runner now keeps
+`HOME=/home/li` and isolates state through `GC_HOME` and the other test-root
+environment variables. The failed root `/tmp/test-city.dOxee5` was removed
+after stopping its leftover test-root Dolt process.
+
+## 2026-05-05 23:52 CEST — stock source lane scripted smoke
+
+Purpose: validate the dedicated source-built runner and confirm whether stock
+`v1.0.0` can pass the session health gate before any dolt-amp observation.
+
+Command:
+
+```bash
+KEEP_TEST_ROOT=1 \
+TEST_CITY_HEALTH_TIMEOUT_SECONDS=10 \
+TEST_CITY_OBSERVATION_SECONDS=15 \
+TEST_CITY_SAMPLE_INTERVAL_SECONDS=5 \
+nix run .#run-idle-stock-source
+```
+
+Root:
+
+```text
+/tmp/test-city.7H4KI7
+```
+
+Observed:
+
+- `gc init --from` exited cleanly with no stderr.
+- The runner reached the session health gate, but `gc --city ... session list
+  --state all --json` stayed `[]`.
+- Supervisor log showed the same session-creation failure as the ad-hoc run:
+  `database not initialized: issue_prefix config is missing`.
+- `.beads/config.yaml` contained `issue_prefix: tcs` and `issue-prefix: tcs`.
+- `gc --city ... bd config get issue_prefix` reported `issue_prefix (not set)`.
+- `gc --city ... bd config list` showed normal bd config rows but no
+  `issue_prefix`.
+- `bd-trace.log` shows `bd create ... mayor ...` failing in about 650 ms; list
+  calls otherwise returned normally.
+
+Artifacts:
+
+```text
+/tmp/test-city.7H4KI7/artifacts/
+```
+
+Result: setup FAIL, bug verdict INVALID. Source-built stock `v1.0.0` can
+initialize the on-disk city files, but it does not create a bd-visible
+`issue_prefix`, so no sessions launch and no dolt-amp observation window is
+valid yet.
+
+## 2026-05-05 23:52-23:53 CEST — stock prebuilt lane scripted smoke
+
+Purpose: compare the upstream release binary against the source-built Nix
+package while keeping the binary in Nix as a fixed-output derivation.
+
+Command:
+
+```bash
+KEEP_TEST_ROOT=1 \
+TEST_CITY_HEALTH_TIMEOUT_SECONDS=10 \
+TEST_CITY_OBSERVATION_SECONDS=15 \
+TEST_CITY_SAMPLE_INTERVAL_SECONDS=5 \
+nix run .#run-idle-stock-prebuilt
+```
+
+Root:
+
+```text
+/tmp/test-city.jJeS5A
+```
+
+Observed:
+
+- The prebuilt `gc version` is `1.0.0`.
+- `gc init --from` created the city files but failed before registration.
+- `gc-init.stderr` reported:
+  `bead store: exec beads start: could not acquire dolt start lock`.
+- The runtime pack directory contained a zero-byte `dolt.lock`, but no
+  `dolt.log`, `dolt-config.yaml`, or provider state file.
+- `.beads/config.yaml` still contained `issue_prefix: tcs` and
+  `issue-prefix: tcs`.
+- `gc --city ... bd config list` could not connect because the Dolt server never
+  started.
+
+Artifacts:
+
+```text
+/tmp/test-city.jJeS5A/artifacts/
+```
+
+Result: setup FAIL, bug verdict INVALID. The raw upstream prebuilt binary does
+not currently reach the same setup point as the source-built Nix package. That
+means the prebuilt lane is useful, but it first needs its own start-lock
+diagnosis before it can isolate "Nix source build changed behavior" from the
+dolt-amp bug.
+
+## Next run — unblock stock-v1.0.0 setup
 
 Planned shape:
 
-- prepare a fresh `canonical-stock` root with a dedicated source-built binary
-  runner, for example `nix run .#run-idle-stock-source`
-- run `gc init --from` and the supervisor inside an isolated environment:
-  `GC_HOME`, `XDG_RUNTIME_DIR`, `TMPDIR`, `DOLT_ROOT_PATH`, and
-  `GIT_CONFIG_GLOBAL` all under the test root
-- shim `systemctl` and `launchctl` inside the isolated `PATH`
-- keep the supervisor local to that isolated `GC_HOME`
-- require a non-empty session list or a successful session-create probe before
-  the five-minute observation window begins
-- observe for 5 minutes
-- capture process, event, dolt-log, and disk-growth artifacts under the test
-  root before teardown
-- add a separate prebuilt-binary runner, for example
-  `nix run .#run-idle-stock-prebuilt`, backed by a fixed-output derivation for
-  the release asset
+- Determine whether stock `v1.0.0` is expected to write `issue_prefix` into the
+  bd database config table during `gc init`, or whether it only writes the
+  compatibility `.beads/config.yaml` file.
+- If stock `v1.0.0` cannot create sessions with current bd, record that as a
+  separate setup regression and add a clearly named compatibility scenario
+  before attempting dolt-amp reproduction.
+- Diagnose the prebuilt lane's Dolt start lock separately from the source lane;
+  do not treat prebuilt failure as evidence about the dolt-amp bug yet.
+- Only run the five-minute dolt-amp observation after the runner health gate
+  sees at least one session bead.
