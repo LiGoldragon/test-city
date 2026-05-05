@@ -57,6 +57,23 @@
         "type": "github"
       }
     },
+    "gascity-upstream-main": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1777705975,
+        "narHash": "sha256-4d0seiqbwoXEeQ6CM3Y9Yuo9YWTYAFSodNcu7Tq3g6A=",
+        "owner": "gastownhall",
+        "repo": "gascity",
+        "rev": "4be4d44be6df85b1c8b7f20c4afcc98fc1713dcc",
+        "type": "github"
+      },
+      "original": {
+        "owner": "gastownhall",
+        "repo": "gascity",
+        "rev": "4be4d44be6df85b1c8b7f20c4afcc98fc1713dcc",
+        "type": "github"
+      }
+    },
     "gascity-v1-0": {
       "flake": false,
       "locked": {
@@ -94,6 +111,7 @@
       "inputs": {
         "flake-utils": "flake-utils",
         "gascity-nix": "gascity-nix",
+        "gascity-upstream-main": "gascity-upstream-main",
         "gascity-v1-0": "gascity-v1-0",
         "nixpkgs": "nixpkgs"
       }

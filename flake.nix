@@ -10,6 +10,11 @@
       flake = false;
     };
 
+    gascity-upstream-main = {
+      url = "github:gastownhall/gascity/4be4d44be6df85b1c8b7f20c4afcc98fc1713dcc";
+      flake = false;
+    };
+
     # Kept available for later fork/upstream comparison apps. The default
     # runner below uses the direct stock v1.0.0 input.
     gascity-nix = {
@@ -18,7 +23,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, gascity-nix, gascity-v1-0, ... }:
+  outputs = { self, nixpkgs, flake-utils, gascity-nix, gascity-v1-0, gascity-upstream-main, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -28,6 +33,7 @@
 
         sourceRoot = ./.;
         stockGascityCommit = "67c821c76f17226883e7153a324dadcfe80ec211";
+        upstreamMainGascityCommit = "4be4d44be6df85b1c8b7f20c4afcc98fc1713dcc";
         stockPrebuiltAssets = {
           x86_64-linux = {
             url = "https://github.com/gastownhall/gascity/releases/download/v1.0.0/gascity_1.0.0_linux_amd64.tar.gz";
@@ -47,13 +53,13 @@
           };
         };
 
-        mkGascity = { version, commit, source }:
+        mkGascity = { version, commit, source, vendorHash ? "sha256-d1esYYBayZ6oFFGC+5/ufa0n8XXrZX5cZa0Lns+NB7s=" }:
           pkgs.buildGo125Module {
             pname = "gascity";
             inherit version;
             src = source;
 
-            vendorHash = "sha256-d1esYYBayZ6oFFGC+5/ufa0n8XXrZX5cZa0Lns+NB7s=";
+            inherit vendorHash;
 
             # Packaging compatibility for NixOS: the embedded bd helper
             # scripts are bash-shaped but tagged /bin/sh in v1.0.0.
@@ -85,6 +91,12 @@
           version = "1.0.0";
           commit = stockGascityCommit;
           source = gascity-v1-0;
+        };
+
+        gascityUpstreamMain = mkGascity {
+          version = "1.0.0-upstream-main-2026-05-05";
+          commit = upstreamMainGascityCommit;
+          source = gascity-upstream-main;
         };
 
         gascityStockV1Prebuilt =
@@ -192,6 +204,14 @@
           commit = stockGascityCommit;
           provenance = "upstream-prebuilt";
         };
+
+        runIdleUpstreamMainSource = mkIdleDoltAmpRunner {
+          name = "run-idle-upstream-main-source";
+          gascityPackage = gascityUpstreamMain;
+          release = "upstream-main";
+          commit = upstreamMainGascityCommit;
+          provenance = "source-built";
+        };
       in
       {
         devShells.default = pkgs.mkShell {
@@ -204,6 +224,7 @@
             echo "Prepare: nix run . -- <template>"
             echo "Run idle source: nix run .#run-idle-stock-source"
             echo "Run idle prebuilt: nix run .#run-idle-stock-prebuilt"
+            echo "Run idle upstream main: nix run .#run-idle-upstream-main-source -- upstream-main"
             echo "Tear down: nix run .#tear-down -- /tmp/test-city..."
           '';
         };
@@ -214,9 +235,11 @@
           tear-down-test-city = tearDownTestCity;
           gascity-stock-v1-0 = gascityStockV1;
           gascity-stock-v1-0-prebuilt = gascityStockV1Prebuilt;
+          gascity-upstream-main = gascityUpstreamMain;
           gascity-current-fork = pkgs.gascity;
           run-idle-stock-source = runIdleStockSource;
           run-idle-stock-prebuilt = runIdleStockPrebuilt;
+          run-idle-upstream-main-source = runIdleUpstreamMainSource;
         };
 
         apps = {
@@ -239,6 +262,10 @@
           run-idle-stock-prebuilt = {
             type = "app";
             program = "${runIdleStockPrebuilt}/bin/run-idle-stock-prebuilt";
+          };
+          run-idle-upstream-main-source = {
+            type = "app";
+            program = "${runIdleUpstreamMainSource}/bin/run-idle-upstream-main-source";
           };
         };
       }
