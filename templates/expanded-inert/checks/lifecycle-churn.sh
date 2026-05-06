@@ -5,6 +5,15 @@ city="${TEST_CITY_INITIALIZED_CITY:?TEST_CITY_INITIALIZED_CITY is required}"
 artifacts="${TEST_CITY_ARTIFACTS_DIR:?TEST_CITY_ARTIFACTS_DIR is required}"
 session_starts="$city/test-artifacts/session-starts.tsv"
 log="$artifacts/lifecycle-churn.tsv"
+workspace_name="$(
+  awk -F ' *= *' '
+    $1 == "name" {
+      gsub(/"/, "", $2)
+      print $2
+      exit
+    }
+  ' "$city/city.toml"
+)"
 
 printf 'timestamp\taction\tdetail\n' >"$log"
 
@@ -176,25 +185,64 @@ wait_worker_restart() {
   record "wait-${alias}-restart" "before=$before current=$current"
 }
 
+wait_tmux_session_absent() {
+  local session_name="$1"
+  local label="$2"
+  local deadline=$((SECONDS + 120))
+
+  while tmux -L "$workspace_name" has-session -t "$session_name" >/dev/null 2>&1; do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      record "wait-$label" "timeout waiting for tmux session $session_name to stop"
+      tmux -L "$workspace_name" list-sessions >&2 || true
+      return 1
+    fi
+    sleep 1
+  done
+
+  record "wait-$label" "tmux session $session_name absent"
+}
+
+wait_tmux_session_present() {
+  local session_name="$1"
+  local label="$2"
+  local deadline=$((SECONDS + 120))
+
+  until tmux -L "$workspace_name" has-session -t "$session_name" >/dev/null 2>&1; do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      record "wait-$label" "timeout waiting for tmux session $session_name to start"
+      tmux -L "$workspace_name" list-sessions >&2 || true
+      return 1
+    fi
+    sleep 1
+  done
+
+  record "wait-$label" "tmux session $session_name present"
+}
+
 snapshot_sessions baseline
 run_gc wake-auditor-initial session wake auditor
 wait_alias_state auditor auditor active auditor-initial-active
+wait_tmux_session_present auditor auditor-initial-runtime-started
 auditor_initial_id="$(active_session_id auditor auditor auditor-initial-id)"
 record "auditor-initial-id" "$auditor_initial_id"
 
 run_gc suspend-auditor session suspend auditor
 wait_alias_state auditor auditor suspended auditor-suspended
+wait_tmux_session_absent auditor auditor-suspended-runtime-stopped
 
 run_gc wake-auditor-after-suspend session wake auditor
 wait_alias_state auditor auditor active auditor-after-suspend-active
+wait_tmux_session_present auditor auditor-after-suspend-runtime-started
 auditor_after_suspend_id="$(active_session_id auditor auditor auditor-after-suspend-id)"
 assert_equal "auditor-suspend-wake-preserves-id" "$auditor_initial_id" "$auditor_after_suspend_id"
 
 run_gc close-auditor session close auditor
 wait_no_nonclosed_alias auditor auditor auditor-closed
+wait_tmux_session_absent auditor auditor-closed-runtime-stopped
 
 run_gc wake-auditor-after-close session wake auditor
 wait_alias_state auditor auditor active auditor-after-close-active
+wait_tmux_session_present auditor auditor-after-close-runtime-started
 auditor_after_close_id="$(active_session_id auditor auditor auditor-after-close-id)"
 assert_not_equal "auditor-close-wake-replaces-id" "$auditor_initial_id" "$auditor_after_close_id"
 
