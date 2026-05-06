@@ -361,6 +361,9 @@ run_after_health_script() {
     TEST_CITY_INITIALIZED_CITY="$initialized_city" \
     TEST_CITY_ARTIFACTS_DIR="$artifacts_dir" \
     TEST_CITY_AFTER_HEALTH_SCRIPT="$script_path" \
+    TEST_CITY_LIFECYCLE_CHURN_CYCLES="${TEST_CITY_LIFECYCLE_CHURN_CYCLES:-}" \
+    TEST_CITY_LIFECYCLE_CHURN_WORKER_KILLS="${TEST_CITY_LIFECYCLE_CHURN_WORKER_KILLS:-}" \
+    TEST_CITY_TMUX_SOCKET="${TEST_CITY_TMUX_SOCKET:-}" \
     bash "$script_path" \
     >"$artifacts_dir/after-health.stdout" \
     2>"$artifacts_dir/after-health.stderr"
