@@ -9,6 +9,7 @@ health_timeout_seconds="${TEST_CITY_HEALTH_TIMEOUT_SECONDS:-60}"
 sample_interval_seconds="${TEST_CITY_SAMPLE_INTERVAL_SECONDS:-5}"
 city_name="${TEST_CITY_CITY_NAME:-test-$template}"
 expected_active_sessions="${TEST_CITY_EXPECT_ACTIVE_SESSIONS:-0}"
+after_health_script="${TEST_CITY_AFTER_HEALTH_SCRIPT:-}"
 
 case "$observation_seconds:$health_timeout_seconds:$sample_interval_seconds:$expected_active_sessions" in
   *[!0-9:]* | *::* | :* | *:)
@@ -140,6 +141,7 @@ write_result() {
     --arg initialized_city "$(canonical_path "$initialized_city")" \
     --arg gc_binary "$(command -v gc || true)" \
     --arg gc_version "$(gc version 2>/dev/null | head -n 1 || true)" \
+    --arg after_health_script "$after_health_script" \
     --argjson observation_seconds "$observation_seconds" \
     --argjson health_timeout_seconds "$health_timeout_seconds" \
     --argjson sample_interval_seconds "$sample_interval_seconds" \
@@ -157,6 +159,9 @@ write_result() {
       gascity: {
         binary: $gc_binary,
         version: $gc_version
+      },
+      action: {
+        after_health_script: $after_health_script
       },
       timing: {
         observation_seconds: $observation_seconds,
@@ -335,6 +340,32 @@ wait_for_session_health() {
   done
 }
 
+run_after_health_script() {
+  [ -n "$after_health_script" ] || return 0
+
+  local script_path="$after_health_script"
+  if [ "${script_path#/}" = "$script_path" ]; then
+    if [ -f "$initialized_city/$script_path" ]; then
+      script_path="$initialized_city/$script_path"
+    else
+      script_path="$source_root/$script_path"
+    fi
+  fi
+  if [ ! -f "$script_path" ]; then
+    printf 'run-idle-dolt-amp: after-health script not found: %s\n' "$script_path" >&2
+    return 1
+  fi
+
+  run_isolated env \
+    TEST_CITY_ROOT="$test_root" \
+    TEST_CITY_INITIALIZED_CITY="$initialized_city" \
+    TEST_CITY_ARTIFACTS_DIR="$artifacts_dir" \
+    TEST_CITY_AFTER_HEALTH_SCRIPT="$script_path" \
+    bash "$script_path" \
+    >"$artifacts_dir/after-health.stdout" \
+    2>"$artifacts_dir/after-health.stderr"
+}
+
 read_dolt_port() {
   local state_file="$initialized_city/.gc/runtime/packs/dolt/dolt-provider-state.json"
   [ -f "$state_file" ] || return 0
@@ -459,6 +490,7 @@ seed_supervisor_config
   printf 'TEST_CITY_TEMPLATE=%s\n' "$template"
   printf 'TEST_CITY_BINARY_LANE=%s\n' "$binary_lane"
   printf 'TEST_CITY_EXPECT_ACTIVE_SESSIONS=%s\n' "$expected_active_sessions"
+  printf 'TEST_CITY_AFTER_HEALTH_SCRIPT=%s\n' "$after_health_script"
   printf 'GC_HOME=%s\n' "$gc_home"
   printf 'XDG_RUNTIME_DIR=%s\n' "$runtime_dir"
   printf 'TMPDIR=%s\n' "$temporary_dir"
@@ -483,6 +515,11 @@ run_isolated gc --city "$initialized_city" session list --state all --json \
 if ! wait_for_session_health; then
   capture_setup_diagnostics
   fail_setup "session health gate failed: no sessions became visible"
+fi
+
+if ! run_after_health_script; then
+  capture_setup_diagnostics
+  fail_setup "after-health script failed"
 fi
 
 write_headers

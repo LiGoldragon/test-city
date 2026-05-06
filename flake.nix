@@ -235,6 +235,15 @@
           '';
         };
 
+        runIdlePathGcOnDemand = pkgs.writeShellApplication {
+          name = "run-idle-path-gc-on-demand";
+          runtimeInputs = cityRuntimeDepsWithoutGascity ++ harnessDeps;
+          text = ''
+            export TEST_CITY_SOURCE_ROOT=${sourceRoot}
+            exec ${pkgs.bash}/bin/bash ${sourceRoot}/scripts/run-idle-path-gc-on-demand.sh "$@"
+          '';
+        };
+
         runIdleStockSource = mkIdleDoltAmpRunner {
           name = "run-idle-stock-source";
           gascityPackage = gascityStockV1;
@@ -300,6 +309,7 @@
             echo "Run idle gascity dolt-amp fix: nix run .#run-idle-gascity-dolt-amp-source"
             echo "Run idle PATH gc: nix run .#run-idle-path-gc"
             echo "Run expanded PATH gc: nix run .#run-idle-path-gc-expanded"
+            echo "Run on-demand PATH gc: nix run .#run-idle-path-gc-on-demand"
             echo "Tear down: nix run .#tear-down -- /tmp/test-city..."
           '';
         };
@@ -322,6 +332,7 @@
           run-idle-gascity-dolt-amp-source = runIdleGascityDoltAmpSource;
           run-idle-path-gc = runIdlePathGc;
           run-idle-path-gc-expanded = runIdlePathGcExpanded;
+          run-idle-path-gc-on-demand = runIdlePathGcOnDemand;
         };
 
         apps = {
@@ -368,6 +379,10 @@
           run-idle-path-gc-expanded = {
             type = "app";
             program = "${runIdlePathGcExpanded}/bin/run-idle-path-gc-expanded";
+          };
+          run-idle-path-gc-on-demand = {
+            type = "app";
+            program = "${runIdlePathGcOnDemand}/bin/run-idle-path-gc-on-demand";
           };
         };
       }

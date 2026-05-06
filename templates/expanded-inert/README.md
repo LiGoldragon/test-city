@@ -16,3 +16,7 @@ Expected behavior:
 The runner is `nix run .#run-idle-path-gc-expanded`. It uses the `gc` already
 on `PATH`, waits for four active sessions, and observes for ten minutes by
 default.
+
+The active wake runner is `nix run .#run-idle-path-gc-on-demand`. It waits for
+the same four-session baseline, runs `checks/wake-auditor.sh`, and then
+observes the five-session steady state for five minutes.
