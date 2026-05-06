@@ -8,10 +8,11 @@ observation_seconds="${TEST_CITY_OBSERVATION_SECONDS:-300}"
 health_timeout_seconds="${TEST_CITY_HEALTH_TIMEOUT_SECONDS:-60}"
 sample_interval_seconds="${TEST_CITY_SAMPLE_INTERVAL_SECONDS:-5}"
 city_name="${TEST_CITY_CITY_NAME:-test-$template}"
+expected_active_sessions="${TEST_CITY_EXPECT_ACTIVE_SESSIONS:-0}"
 
-case "$observation_seconds:$health_timeout_seconds:$sample_interval_seconds" in
+case "$observation_seconds:$health_timeout_seconds:$sample_interval_seconds:$expected_active_sessions" in
   *[!0-9:]* | *::* | :* | *:)
-    printf 'run-idle-dolt-amp: timing values must be positive integers\n' >&2
+    printf 'run-idle-dolt-amp: timing values and expected session count must be integers\n' >&2
     exit 1
     ;;
 esac
@@ -142,6 +143,7 @@ write_result() {
     --argjson observation_seconds "$observation_seconds" \
     --argjson health_timeout_seconds "$health_timeout_seconds" \
     --argjson sample_interval_seconds "$sample_interval_seconds" \
+    --argjson expected_active_sessions "$expected_active_sessions" \
     '{
       status: $status,
       reason: $reason,
@@ -159,7 +161,8 @@ write_result() {
       timing: {
         observation_seconds: $observation_seconds,
         health_timeout_seconds: $health_timeout_seconds,
-        sample_interval_seconds: $sample_interval_seconds
+        sample_interval_seconds: $sample_interval_seconds,
+        expected_active_sessions: $expected_active_sessions
       }
     }' >"$artifacts_dir/result.json"
 }
@@ -316,7 +319,15 @@ wait_for_session_health() {
   local session_path="$artifacts_dir/session-list.health.json"
   local session_stderr="$artifacts_dir/session-list.health.stderr"
   until run_isolated gc --city "$initialized_city" session list --state all --json >"$session_path" 2>"$session_stderr" \
-    && jq -e 'type == "array" and length > 0' "$session_path" >/dev/null; do
+    && jq -e --argjson expected "$expected_active_sessions" '
+      type == "array" and (
+        if $expected > 0 then
+          ([.[] | select(((.State // .state // "") == "active") and (((.Closed // .closed // false) | not))) ] | length) >= $expected
+        else
+          length > 0
+        end
+      )
+    ' "$session_path" >/dev/null; do
     if [ "$SECONDS" -ge "$deadline" ]; then
       return 1
     fi
@@ -447,6 +458,7 @@ seed_supervisor_config
   printf 'TEST_CITY_ROOT=%s\n' "$test_root"
   printf 'TEST_CITY_TEMPLATE=%s\n' "$template"
   printf 'TEST_CITY_BINARY_LANE=%s\n' "$binary_lane"
+  printf 'TEST_CITY_EXPECT_ACTIVE_SESSIONS=%s\n' "$expected_active_sessions"
   printf 'GC_HOME=%s\n' "$gc_home"
   printf 'XDG_RUNTIME_DIR=%s\n' "$runtime_dir"
   printf 'TMPDIR=%s\n' "$temporary_dir"
