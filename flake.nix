@@ -253,6 +253,15 @@
           '';
         };
 
+        runIdlePathGcLifecycleStress = pkgs.writeShellApplication {
+          name = "run-idle-path-gc-lifecycle-stress";
+          runtimeInputs = cityRuntimeDepsWithoutGascity ++ harnessDeps;
+          text = ''
+            export TEST_CITY_SOURCE_ROOT=${sourceRoot}
+            exec ${pkgs.bash}/bin/bash ${sourceRoot}/scripts/run-idle-path-gc-lifecycle-stress.sh "$@"
+          '';
+        };
+
         runIdleStockSource = mkIdleDoltAmpRunner {
           name = "run-idle-stock-source";
           gascityPackage = gascityStockV1;
@@ -320,6 +329,7 @@
             echo "Run expanded PATH gc: nix run .#run-idle-path-gc-expanded"
             echo "Run on-demand PATH gc: nix run .#run-idle-path-gc-on-demand"
             echo "Run lifecycle churn PATH gc: nix run .#run-idle-path-gc-lifecycle-churn"
+            echo "Run lifecycle stress PATH gc: nix run .#run-idle-path-gc-lifecycle-stress"
             echo "Tear down: nix run .#tear-down -- /tmp/test-city..."
           '';
         };
@@ -344,6 +354,7 @@
           run-idle-path-gc-expanded = runIdlePathGcExpanded;
           run-idle-path-gc-on-demand = runIdlePathGcOnDemand;
           run-idle-path-gc-lifecycle-churn = runIdlePathGcLifecycleChurn;
+          run-idle-path-gc-lifecycle-stress = runIdlePathGcLifecycleStress;
         };
 
         apps = {
@@ -398,6 +409,10 @@
           run-idle-path-gc-lifecycle-churn = {
             type = "app";
             program = "${runIdlePathGcLifecycleChurn}/bin/run-idle-path-gc-lifecycle-churn";
+          };
+          run-idle-path-gc-lifecycle-stress = {
+            type = "app";
+            program = "${runIdlePathGcLifecycleStress}/bin/run-idle-path-gc-lifecycle-stress";
           };
         };
       }

@@ -230,40 +230,69 @@ wait_tmux_session_present() {
   record "wait-$label" "tmux session $session_name present"
 }
 
+cycles="${TEST_CITY_LIFECYCLE_CHURN_CYCLES:-1}"
+worker_kills="${TEST_CITY_LIFECYCLE_CHURN_WORKER_KILLS:-$cycles}"
+case "$cycles:$worker_kills" in
+  *[!0-9:]* | *::* | :* | *:)
+    printf 'lifecycle-churn: cycle counts must be non-negative integers\n' >&2
+    exit 1
+    ;;
+esac
+if [ "$cycles" -lt 1 ]; then
+  printf 'lifecycle-churn: TEST_CITY_LIFECYCLE_CHURN_CYCLES must be at least 1\n' >&2
+  exit 1
+fi
+if [ "$worker_kills" -gt "$cycles" ]; then
+  printf 'lifecycle-churn: TEST_CITY_LIFECYCLE_CHURN_WORKER_KILLS cannot exceed cycles\n' >&2
+  exit 1
+fi
+
 snapshot_sessions baseline
 run_gc wake-auditor-initial session wake auditor
 wait_alias_state auditor auditor active auditor-initial-active
 wait_tmux_session_present auditor auditor-initial-runtime-started
-auditor_initial_id="$(active_session_id auditor auditor auditor-initial-id)"
-record "auditor-initial-id" "$auditor_initial_id"
+auditor_current_id="$(active_session_id auditor auditor auditor-initial-id)"
+record "auditor-initial-id" "$auditor_current_id"
 
-run_gc suspend-auditor session suspend auditor
-wait_alias_state auditor auditor suspended auditor-suspended
-wait_tmux_session_absent auditor auditor-suspended-runtime-stopped
+cycle=1
+while [ "$cycle" -le "$cycles" ]; do
+  prefix="cycle-${cycle}"
 
-run_gc wake-auditor-after-suspend session wake auditor
-wait_alias_state auditor auditor active auditor-after-suspend-active
-wait_tmux_session_present auditor auditor-after-suspend-runtime-started
-auditor_after_suspend_id="$(active_session_id auditor auditor auditor-after-suspend-id)"
-assert_equal "auditor-suspend-wake-preserves-id" "$auditor_initial_id" "$auditor_after_suspend_id"
+  run_gc "${prefix}-suspend-auditor" session suspend auditor
+  wait_alias_state auditor auditor suspended "${prefix}-auditor-suspended"
+  wait_tmux_session_absent auditor "${prefix}-auditor-suspended-runtime-stopped"
 
-run_gc close-auditor session close auditor
-wait_no_nonclosed_alias auditor auditor auditor-closed
-wait_tmux_session_absent auditor auditor-closed-runtime-stopped
+  run_gc "${prefix}-wake-auditor-after-suspend" session wake auditor
+  wait_alias_state auditor auditor active "${prefix}-auditor-after-suspend-active"
+  wait_tmux_session_present auditor "${prefix}-auditor-after-suspend-runtime-started"
+  auditor_after_suspend_id="$(active_session_id auditor auditor "${prefix}-auditor-after-suspend-id")"
+  assert_equal "${prefix}-auditor-suspend-wake-preserves-id" "$auditor_current_id" "$auditor_after_suspend_id"
 
-run_gc wake-auditor-after-close session wake auditor
-wait_alias_state auditor auditor active auditor-after-close-active
-wait_tmux_session_present auditor auditor-after-close-runtime-started
-auditor_after_close_id="$(active_session_id auditor auditor auditor-after-close-id)"
-assert_not_equal "auditor-close-wake-replaces-id" "$auditor_initial_id" "$auditor_after_close_id"
+  run_gc "${prefix}-close-auditor" session close auditor
+  wait_no_nonclosed_alias auditor auditor "${prefix}-auditor-closed"
+  wait_tmux_session_absent auditor "${prefix}-auditor-closed-runtime-stopped"
 
-worker_1_starts_before="$(count_starts_for_alias worker-1)"
-run_gc kill-worker-1 session kill worker-1
-wait_worker_restart worker-1 "$worker_1_starts_before"
-wait_alias_state worker-1 worker active worker-1-after-kill-active
+  run_gc "${prefix}-wake-auditor-after-close" session wake auditor
+  wait_alias_state auditor auditor active "${prefix}-auditor-after-close-active"
+  wait_tmux_session_present auditor "${prefix}-auditor-after-close-runtime-started"
+  auditor_after_close_id="$(active_session_id auditor auditor "${prefix}-auditor-after-close-id")"
+  assert_not_equal "${prefix}-auditor-close-wake-replaces-id" "$auditor_current_id" "$auditor_after_close_id"
+  auditor_current_id="$auditor_after_close_id"
 
+  if [ "$cycle" -le "$worker_kills" ]; then
+    worker_alias="worker-$(( ((cycle - 1) % 2) + 1 ))"
+    worker_starts_before="$(count_starts_for_alias "$worker_alias")"
+    run_gc "${prefix}-kill-${worker_alias}" session kill "$worker_alias"
+    wait_worker_restart "$worker_alias" "$worker_starts_before"
+    wait_alias_state "$worker_alias" worker active "${prefix}-${worker_alias}-after-kill-active"
+  fi
+
+  cycle=$((cycle + 1))
+done
+
+expected_starts=$((4 + 1 + (cycles * 2) + worker_kills))
 total_starts="$(wc -l <"$session_starts")"
-assert_equal "session-start-count-after-churn" "8" "$total_starts"
+assert_equal "session-start-count-after-churn" "$expected_starts" "$total_starts"
 snapshot_sessions final
-record "lifecycle-churn" "complete"
+record "lifecycle-churn" "complete cycles=$cycles worker_kills=$worker_kills"
 printf 'lifecycle-churn: complete\n'
