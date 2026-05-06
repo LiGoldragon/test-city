@@ -424,8 +424,7 @@ Root:
 Observed:
 
 - Result was `setup-failed`: no sessions became visible.
-- Gas City binary:
-  `/nix/store/gbbnf94h92vx5wm2q2whd67h6hblc30y-gascity-1.0.0-codex-2026-05-05/bin/gc`.
+- Gas City binary was the then-current `gascity-nix` lane package.
 - `dolt-config-table.server.stdout` showed `types.custom` but no
   `issue_prefix`.
 - `bd-config-get-issue-prefix.stdout` reported `issue_prefix (not set)`.
@@ -652,8 +651,7 @@ Observed:
 
 - Result was `observed`: setup passed and the full observation window
   completed.
-- Binary:
-  `/nix/store/ily36gwx8fyrnkzbx61vdv3zl5gqprq7-gascity-1.0.0-codex-2026-05-06/bin/gc`.
+- Binary was the updated `gascity-nix` lane package.
 - Final session was active mayor session `tcs-chq`.
 - Direct SQL config table had `issue_prefix | tcs` and `types.custom`.
 - `dolt-metrics.tsv`:
@@ -678,3 +676,137 @@ Artifacts:
 ```
 
 Result: updated `gascity-nix` verdict PASS for this minimal always-on city.
+
+## 2026-05-06 03:09 CEST — CriomOS-home deployment activation
+
+Purpose: follow the user redirect: shelve current-upstream HEAD testing, point
+`CriomOS-home` at the fixed `LiGoldragon/gascity-nix` package, activate through
+`lojix-cli`, and then test the `gc` found on `PATH`.
+
+Repos:
+
+```text
+CriomOS-home
+78a0bed8c449
+
+test-city
+39ae9f79689d
+```
+
+Activation request:
+
+```nota
+(HomeOnly goldragon ouranos li "/home/li/git/goldragon/datom.nota" "github:LiGoldragon/CriomOS-home/main" Activate None)
+```
+
+Activation log:
+
+```text
+/tmp/lojix-home-activate-20260506T030934.log
+```
+
+Observed:
+
+- `CriomOS-home` pushed before activation, satisfying the CriomOS build rule.
+- `lojix-cli` activation completed successfully.
+- `gc` on `PATH` resolved to `/home/li/.nix-profile/bin/gc`.
+- `gc version --long` reported:
+  `1.0.0-codex-2026-05-06 (commit: 6462edf36cefa88bde03f19439173a3bc821a708, built: 1970-01-01T00:00:00Z)`.
+
+Result: deployment activation PASS. The subsequent test-city runs use the
+activated PATH binary, not a Gas City package supplied by the test app.
+
+## 2026-05-06 03:12-03:18 CEST — PATH gc canonical idle observation
+
+Purpose: rerun the minimal dolt-amp scenario through the `gc` binary from the
+activated user profile. This lane intentionally supplies Dolt, beads, tmux,
+and diagnostic tools through Nix, but supplies no `gc` package in its runtime
+inputs.
+
+Test-city lane:
+
+```bash
+nix run .#run-idle-path-gc
+```
+
+Root:
+
+```text
+/tmp/test-city.912f6H
+```
+
+Observed:
+
+- Result was `observed`: setup passed and the full five-minute observation
+  window completed.
+- `result.json` recorded `binary_lane = path-gc`, `gascity.binary =
+  /home/li/.nix-profile/bin/gc`, and `gascity.version =
+  1.0.0-codex-2026-05-06`.
+- Final session was active mayor session `tcs-mu9`.
+- `dolt-metrics.tsv`:
+  - first sample: commit count 9 at `2026-05-06T01:12:59Z`;
+  - second sample: commit count 13 at `2026-05-06T01:13:05Z`;
+  - third and final steady value: commit count 14 for the remaining 51
+    samples.
+- `event-samples.tsv`:
+  - events rose from 5 to 10 to 11 during startup;
+  - events rose once more to 12 at `2026-05-06T01:13:39Z`;
+  - final 46 samples remained 12.
+- Dolt process `%CPU` decayed from 23.4% at first sample to 3.6% at the final
+  sample. Average over sampled Dolt lines was 6.89%.
+
+Result: PATH `gc` canonical idle verdict PASS. No post-startup Dolt write loop
+appeared.
+
+## 2026-05-06 03:22-03:33 CEST — PATH gc expanded idle observation
+
+Purpose: ramp beyond the minimal city using documented Gas City behavior:
+`[[named_session]]` supports `always` and `on_demand`, agents support
+`min_active_sessions` / `max_active_sessions`, and the controller should
+converge without repeated writes after startup.
+
+Added infrastructure:
+
+```text
+templates/expanded-inert
+scripts/run-idle-path-gc-expanded.sh
+nix app: run-idle-path-gc-expanded
+```
+
+Expected behavior:
+
+- `mayor` and `deacon` are always-on named sessions.
+- `worker` has `min_active_sessions = 2` and `max_active_sessions = 2`.
+- `auditor` is an on-demand named session and should remain absent.
+- After startup convergence, Dolt commits and events should flatten.
+
+Root:
+
+```text
+/tmp/test-city.8w1xfH
+```
+
+Observed:
+
+- Result was `observed`: setup passed, four active sessions were present before
+  sampling, and the full ten-minute observation window completed.
+- Final active sessions:
+  - `mayor` from template `mayor`;
+  - `deacon` from template `deacon`;
+  - `worker-1` and `worker-2` from template `worker`.
+- No `auditor` session was present.
+- `test-artifacts/session-starts.tsv` had exactly four lines, one per expected
+  session, so there was no visible restart churn.
+- `dolt-metrics.tsv`:
+  - first two samples: commit count 33;
+  - remaining 104 samples: commit count 37.
+- `event-samples.tsv`:
+  - first two samples: 39 events;
+  - next four samples: 43 events;
+  - remaining 100 samples: 47 events.
+- Dolt process `%CPU` decayed from 25.2% at first sample to 7.4% at the final
+  sample. Average over sampled Dolt lines was 10.31%.
+
+Result: PATH `gc` expanded idle verdict PASS. Named-session and fixed-pool
+startup converged, the on-demand session stayed cold, and no post-convergence
+Dolt write loop appeared.

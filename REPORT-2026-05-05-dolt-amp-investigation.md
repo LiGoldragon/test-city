@@ -54,6 +54,21 @@ sample series. The updated `LiGoldragon/gascity-nix` package pin at
 `db668627ca3293c45778390ecf1b193c74607246` was also validated through the same
 five-minute lane with the same flat commit/event result.
 
+After `CriomOS-home` was moved to that `gascity-nix` pin and activated through
+`lojix-cli`, the `gc` found on `PATH` reported
+`6462edf36cefa88bde03f19439173a3bc821a708`. The PATH binary passed both:
+
+- canonical five-minute idle test: commits reached 14 after startup and then
+  stayed flat for 51 samples; events reached 12 and stayed flat for 46 samples.
+- expanded ten-minute idle test: always-on `mayor` and `deacon`, two fixed pool
+  workers, and cold on-demand `auditor`; commits reached 37 and stayed flat for
+  104 samples; events reached 47 and stayed flat for 100 samples.
+
+This evidence says the test-city reproduction no longer finds the dolt
+write-amp bug in the deployed PATH binary. It does not by itself prove every
+Criopolis production load shape is fixed; the next ramp target is active
+on-demand wake behavior.
+
 ## What was observed
 
 Pre-patch (Criopolis production city, supervisor on `gascity 76f46b45 = v1.0.0
