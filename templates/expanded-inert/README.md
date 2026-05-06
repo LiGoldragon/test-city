@@ -20,3 +20,9 @@ default.
 The active wake runner is `nix run .#run-idle-path-gc-on-demand`. It waits for
 the same four-session baseline, runs `checks/wake-auditor.sh`, and then
 observes the five-session steady state for five minutes.
+
+The lifecycle churn runner is `nix run .#run-idle-path-gc-lifecycle-churn`. It
+waits for the four-session baseline, then runs `checks/lifecycle-churn.sh`:
+wake auditor, suspend auditor, wake auditor, close auditor, wake auditor again,
+kill `worker-1`, and observe the final five-session steady state for ten
+minutes.
