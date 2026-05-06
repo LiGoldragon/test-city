@@ -810,3 +810,59 @@ Observed:
 Result: PATH `gc` expanded idle verdict PASS. Named-session and fixed-pool
 startup converged, the on-demand session stayed cold, and no post-convergence
 Dolt write loop appeared.
+
+## 2026-05-06 03:39-03:45 CEST — PATH gc on-demand wake observation
+
+Purpose: exercise active on-demand materialization after the expanded baseline
+has already converged. This covers a controller path that passive idle tests do
+not touch: `gc session wake auditor` should start the on-demand named session
+once, then settle without repeated commits, event churn, or restart loops.
+
+Added infrastructure:
+
+```text
+templates/expanded-inert/checks/wake-auditor.sh
+scripts/run-idle-path-gc-on-demand.sh
+nix app: run-idle-path-gc-on-demand
+```
+
+Test-city commit:
+
+```text
+9305564d13f6
+```
+
+Root:
+
+```text
+/tmp/test-city.zDKiIL
+```
+
+Observed:
+
+- Result was `observed`: setup passed, the four-session expanded baseline was
+  healthy, `checks/wake-auditor.sh` ran, and the full five-minute post-wake
+  observation window completed.
+- `gc session wake auditor` returned a wake request for session `tei-mx9`.
+- Final active sessions:
+  - `auditor` from template `auditor`;
+  - `mayor` from template `mayor`;
+  - `deacon` from template `deacon`;
+  - `worker-1` and `worker-2` from template `worker`.
+- `test-artifacts/session-starts.tsv` had exactly five lines: the four
+  expanded baseline sessions plus one `auditor` start.
+- Session samples showed all five aliases active and not closed for all 53
+  post-wake samples.
+- `dolt-metrics.tsv`:
+  - first sample: commit count 45;
+  - remaining 52 samples: commit count 46;
+  - working changes stayed 0 for all samples.
+- `event-samples.tsv`:
+  - startup/wake samples rose 53 -> 54 -> 59;
+  - remaining 50 samples stayed at 59.
+- Dolt process `%CPU` decayed from 27.2% at first sample to 10.5% at the final
+  sample. Average over sampled Dolt lines was 14.97%.
+
+Result: PATH `gc` on-demand wake verdict PASS. The on-demand session
+materialized once, remained stable, and did not reintroduce the Dolt write-loop
+signature.

@@ -34,8 +34,11 @@ events: 12 after startup, 12 final
    `/home/li/.nix-profile/bin/gc`.
 5. Done: `run-idle-path-gc-expanded` passed a ten-minute expanded idle test
    with always-on named sessions plus a fixed two-slot pool.
-6. Next: add an active on-demand wake scenario so testing covers more than
-   passive startup and idle convergence.
+6. Done: `run-idle-path-gc-on-demand` passed a five-minute post-wake test
+   after materializing the expanded template's on-demand `auditor` session.
+7. Next: add a churn-oriented scenario that performs repeated safe session
+   lifecycle actions and watches for deviation from the documented controller
+   behavior.
 
 ## Current evidence
 
@@ -63,6 +66,19 @@ on-demand auditor: absent, as expected
 commits: 33 -> 37, then 37 for 104 samples
 events: 39 -> 43 -> 47, then 47 for 100 samples
 Dolt CPU: 25.2% first, 7.4% final, 10.31% average
+```
+
+PATH `gc` on-demand wake run:
+
+```text
+/tmp/test-city.zDKiIL
+template: expanded-inert
+action: checks/wake-auditor.sh
+sessions: auditor, mayor, deacon, worker-1, worker-2 active
+session starts: exactly 5
+commits: 45 -> 46, then 46 for 52 samples
+events: 53 -> 54 -> 59, then 59 for 50 samples
+Dolt CPU: 27.2% first, 10.5% final, 14.97% average
 ```
 
 ## Commit discipline

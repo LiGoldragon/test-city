@@ -318,6 +318,23 @@ is wired through a Nix fixed-output derivation, but currently fails earlier on
 Dolt start-lock acquisition. See the testing log for artifact paths and exact
 commands.
 
+After deploying the validated fork through `CriomOS-home`, the `gc` binary from
+the activated user profile passed three isolated test-city lanes:
+
+- canonical idle: one always-on mayor session, five-minute observation;
+- expanded idle: always-on mayor/deacon plus a fixed two-session worker pool,
+  ten-minute observation;
+- expanded on-demand wake: the same expanded baseline plus `gc session wake
+  auditor`, five-minute post-wake observation.
+
+These runs did not reproduce the post-startup Dolt write-loop signature: Dolt
+commits and Gas City events flattened after startup or wake convergence, working
+changes stayed at zero, and session starts matched the expected session count.
+This validates the fork for the currently modeled load shapes. It does not yet
+prove production Criopolis load shapes, so test-city should keep adding
+controller-action and lifecycle-churn scenarios before declaring the issue fully
+burned down.
+
 Cost discipline for test-city: `gpt-5.4-mini` + `model_reasoning_effort=low`,
 short test windows, single-agent test cities unless a scenario specifically
 needs more.
