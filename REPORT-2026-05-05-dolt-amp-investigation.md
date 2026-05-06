@@ -80,6 +80,14 @@ and a ten-minute idle observation. Commits settled at 76 after the second
 sample and event lines settled at 105, so this broader scenario also did not
 show the Dolt write-loop signature.
 
+A repeated lifecycle stress lane then ran three auditor suspend/wake and
+close/wake cycles plus three worker kill/restart checks at
+`/tmp/test-city.0lIzwF`. It produced exactly fourteen expected session starts,
+then held Dolt commits flat at 137 and event lines flat at 199 for the settled
+part of a fifteen-minute observation. This still does not prove every
+production shape is safe, but the isolated idle, on-demand, single-churn, and
+repeated-churn surfaces are now clean against the deployed PATH binary.
+
 ## What was observed
 
 Pre-patch (Criopolis production city, supervisor on `gascity 76f46b45 = v1.0.0

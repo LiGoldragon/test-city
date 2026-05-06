@@ -971,3 +971,80 @@ Observed:
 Result: PATH `gc` lifecycle churn verdict PASS. The previously reproduced
 wake-loss bugs are not present in the activated binary, and this scenario did
 not reintroduce the Dolt write-loop signature.
+
+## 2026-05-06 05:06-05:08 CEST — lifecycle stress wrapper attempt
+
+Purpose: add a separate, higher-pressure PATH lane that repeats the lifecycle
+churn sequence instead of running it once.
+
+Added infrastructure:
+
+```text
+scripts/run-idle-path-gc-lifecycle-stress.sh
+nix app: run-idle-path-gc-lifecycle-stress
+```
+
+Test-city commits:
+
+```text
+fba97d99 add path gc lifecycle stress lane
+8355fac8 pass lifecycle stress settings to checks
+```
+
+Root:
+
+```text
+/tmp/test-city.PuzLUM
+```
+
+Observed:
+
+- This attempt was stopped manually because the wrapper exposed a harness
+  propagation bug: `run_after_health_script` did not pass
+  `TEST_CITY_LIFECYCLE_CHURN_CYCLES` or
+  `TEST_CITY_LIFECYCLE_CHURN_WORKER_KILLS` into the isolated after-health
+  process.
+- The check therefore ran its default single cycle and entered a redundant
+  observation window instead of the intended three-cycle stress run.
+- No Gas City bug verdict came from this root.
+
+Result: harness INVALID. Commit `8355fac8` fixes the environment propagation.
+
+## 2026-05-06 05:11-05:30 CEST — PATH gc lifecycle stress observation
+
+Purpose: run the corrected stress lane against the activated `gc` from `PATH`.
+This repeats the auditor lifecycle churn three times and alternates worker
+kill/restart checks before a fifteen-minute observation window.
+
+Root:
+
+```text
+/tmp/test-city.0lIzwF
+```
+
+Observed:
+
+- Result was `observed`: setup passed, three lifecycle cycles completed, and
+  the full fifteen-minute post-stress observation window completed.
+- Stress settings were `cycles=3` and `worker_kills=3`.
+- Auditor suspend/wake preserved bead identity in all three cycles:
+  `tei-0ta`, then `tei-alt`, then `tei-910`.
+- Auditor close/wake replaced bead identity in all three cycles:
+  `tei-0ta -> tei-alt`, `tei-alt -> tei-910`,
+  `tei-910 -> tei-hfl`.
+- Worker kill/restart checks passed for `worker-1`, `worker-2`, then
+  `worker-1` again.
+- `test-artifacts/session-starts.tsv` had exactly fourteen lines: four
+  baseline sessions, seven auditor runtime starts across initial wake plus
+  three suspend/wake and close/wake cycles, and three worker restarts.
+- Final active sessions were `mayor`, `deacon`, `auditor`, `worker-1`, and
+  `worker-2`.
+- `dolt-metrics.tsv`: commit count was 136 at the first observation sample,
+  137 at the second, and stayed 137 through the remaining 156 samples.
+- `event-samples.tsv`: event lines rose from 188 to 199 during early
+  post-stress cleanup, then stayed 199 for the remainder of the observation.
+- Dolt process `%CPU` decayed from 29.3% at first sample to 11.9% at final
+  sample. Average over sampled Dolt lines was 16.71%.
+
+Result: PATH `gc` lifecycle stress verdict PASS. The repeated lifecycle path
+did not reveal another wake-loss, restart-loop, or Dolt write-loop failure.

@@ -51,8 +51,11 @@ events: 12 after startup, 12 final
    after materializing the expanded template's on-demand `auditor` session.
 7. Done: `run-idle-path-gc-lifecycle-churn` passed a ten-minute post-churn
    observation after suspend/wake, close/wake, and pool-worker kill/restart.
-8. Next: increase breadth with longer or more varied PATH scenarios only after
-   committing the current reports.
+8. Done: `run-idle-path-gc-lifecycle-stress` passed a fifteen-minute
+   post-stress observation after three churn cycles and three worker
+   kill/restarts.
+9. Next: increase breadth into work-assignment or mail/convoy behavior; the
+   current idle/on-demand/lifecycle surface is clean.
 
 ## Current evidence
 
@@ -108,6 +111,21 @@ session starts: exactly 8
 commits: 75 -> 76, then 76 for 103 samples
 events: 99 -> 105, then 105 for the remaining samples
 Dolt CPU: 28.8% first, 10.9% final, 15.53% average
+```
+
+PATH `gc` lifecycle stress run:
+
+```text
+/tmp/test-city.0lIzwF
+template: expanded-inert
+action: checks/lifecycle-churn.sh
+stress settings: cycles=3, worker_kills=3
+auditor identities: tei-0ta -> tei-alt -> tei-910 -> tei-hfl
+worker restarts: worker-1, worker-2, worker-1
+session starts: exactly 14
+commits: 136 -> 137, then 137 for 156 samples
+events: 188 -> 199 during early cleanup, then 199 for the remainder
+Dolt CPU: 29.3% first, 11.9% final, 16.71% average
 ```
 
 ## Commit discipline
