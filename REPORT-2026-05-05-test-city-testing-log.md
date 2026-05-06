@@ -866,3 +866,108 @@ Observed:
 Result: PATH `gc` on-demand wake verdict PASS. The on-demand session
 materialized once, remained stable, and did not reintroduce the Dolt write-loop
 signature.
+
+## 2026-05-06 04:20-04:39 CEST — PATH gc lifecycle churn failures
+
+Purpose: extend testing beyond idle and one-shot on-demand wake by exercising
+safe lifecycle transitions: wake on-demand auditor, suspend it, wait for runtime
+stop, wake it again, close it, wake it again, kill one pool worker, and confirm
+the controller restores the expected pool.
+
+Added infrastructure:
+
+```text
+templates/expanded-inert/checks/lifecycle-churn.sh
+scripts/run-idle-path-gc-lifecycle-churn.sh
+nix app: run-idle-path-gc-lifecycle-churn
+```
+
+Test-city commits:
+
+```text
+5151224a add path gc lifecycle churn scenario
+776b39a6 tighten lifecycle churn runtime checks
+61811501 fix lifecycle churn tmux socket detection
+```
+
+Observed:
+
+- `/tmp/test-city.fPjfdQ`: harness false start. The script expected eight
+  session starts but got seven because it woke after suspend before proving the
+  auditor runtime had actually stopped. This was not a Gas City verdict.
+- `/tmp/test-city.w98EjE`: harness failure. The tmux socket detector assumed
+  initialized `city.toml` still had a workspace name; the script now falls back
+  to `pack.toml`.
+- `/tmp/test-city.CIKR3c`: real bug. After `gc session suspend auditor` stopped
+  the runtime, `gc session wake auditor` returned success but the auditor never
+  restarted; the supervisor later reaped the session as stale. This led to
+  `LiGoldragon/gascity 2ebf4885dbc0183a78d0799355f141de85056857`.
+- `/tmp/test-city.yd9r3V`: real bug persisted. Wake could read the bead while
+  it was still `active`/`awake` but already carried user-hold blocker metadata,
+  so it did not claim a start. This led to
+  `LiGoldragon/gascity cdaac218b92a913139214c0cf91277bc697b021c`.
+- `/tmp/test-city.KIz9Ej`: real bug persisted. Wake set
+  `state=creating,pending_create_claim=true`, then a stale drain-completion
+  write landed afterward and cleared the claim. This led to
+  `LiGoldragon/gascity b56bc3cc807fb8ab30160bd15057dcda453c8e38`.
+- `/tmp/test-city.GGOBOL`: real bug persisted. The drain-completion guard read
+  before the wake claim committed, then its stale `state=asleep` write landed
+  after the wake and still cleared `pending_create_claim`. This led to
+  `LiGoldragon/gascity 60732751665b4c70685f06a425febbe96eeb6286`.
+
+Packaging/deploy pins during this loop:
+
+```text
+gascity-nix 7c2809e -> gascity 2ebf4885
+gascity-nix 8008d1f -> gascity cdaac218
+gascity-nix 5e81ad2 -> gascity b56bc3cc
+gascity-nix 3aa2e01 -> gascity 60732751
+
+CriomOS-home 9d6ded5 -> gascity-nix 7c2809e
+CriomOS-home 21ef0d5 -> gascity-nix 8008d1f
+CriomOS-home 8e1034e -> gascity-nix 5e81ad2
+CriomOS-home ce1f1e3 -> gascity-nix 3aa2e01
+```
+
+Result: lifecycle churn found a separate wake-loss bug family after the
+dolt write-amp fix. The final candidate is validated below.
+
+## 2026-05-06 04:49-05:01 CEST — PATH gc lifecycle churn observation
+
+Purpose: rerun the churn scenario using the activated `gc` from `PATH` after
+pinning and activating `LiGoldragon/gascity 60732751665b4c70685f06a425febbe96eeb6286`.
+
+Root:
+
+```text
+/tmp/test-city.hAIXrY
+```
+
+Observed:
+
+- Result was `observed`: setup passed, lifecycle churn completed, and the full
+  ten-minute post-churn observation window completed.
+- `gc version --long` from `PATH` reported
+  `60732751665b4c70685f06a425febbe96eeb6286` before the run.
+- Suspend/wake preserved the auditor session bead: `tei-cr7` before suspend
+  and `tei-cr7` after wake.
+- Close/wake replaced the auditor bead as expected: `tei-cr7` closed and
+  `tei-dl9` became active.
+- Killing `worker-1` restarted that pool slot: one prior `worker-1` start,
+  two after restart.
+- `test-artifacts/session-starts.tsv` had exactly eight lines: four baseline
+  sessions, two auditor starts around suspend/wake and close/wake, one auditor
+  replacement after close, and one worker restart.
+- Final active sessions were `mayor`, `deacon`, `auditor`, `worker-1`, and
+  `worker-2`. The fifth active session is expected because the churn script
+  deliberately leaves the on-demand auditor awake after the close/wake step.
+- `dolt-metrics.tsv`: commit count was 75 at the first observation sample,
+  76 at the second, and stayed 76 through the remaining 103 samples.
+- `event-samples.tsv`: event lines rose from 99 to 105 during the first few
+  observation samples, then stayed 105 through the remaining samples.
+- Dolt process `%CPU` decayed from 28.8% at first sample to 10.9% at final
+  sample. Average over sampled Dolt lines was 15.53%.
+
+Result: PATH `gc` lifecycle churn verdict PASS. The previously reproduced
+wake-loss bugs are not present in the activated binary, and this scenario did
+not reintroduce the Dolt write-loop signature.

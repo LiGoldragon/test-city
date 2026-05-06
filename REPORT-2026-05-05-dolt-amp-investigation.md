@@ -69,6 +69,17 @@ write-amp bug in the deployed PATH binary. It does not by itself prove every
 Criopolis production load shape is fixed; the next ramp target is active
 on-demand wake behavior.
 
+Ramp testing then found and fixed a separate lifecycle wake-loss family. The
+expanded PATH scenario reproduced `gc session wake auditor` returning success
+after suspend while the stopped runtime never restarted. The fix chain now ends
+at `LiGoldragon/gascity 60732751665b4c70685f06a425febbe96eeb6286`, packaged by
+`LiGoldragon/gascity-nix 3aa2e01c480ccd042c321802095bc7d599763579` and
+activated through `CriomOS-home ce1f1e3`. The final lifecycle churn run at
+`/tmp/test-city.hAIXrY` passed suspend/wake, close/wake, worker kill/restart,
+and a ten-minute idle observation. Commits settled at 76 after the second
+sample and event lines settled at 105, so this broader scenario also did not
+show the Dolt write-loop signature.
+
 ## What was observed
 
 Pre-patch (Criopolis production city, supervisor on `gascity 76f46b45 = v1.0.0
