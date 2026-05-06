@@ -5,15 +5,26 @@ city="${TEST_CITY_INITIALIZED_CITY:?TEST_CITY_INITIALIZED_CITY is required}"
 artifacts="${TEST_CITY_ARTIFACTS_DIR:?TEST_CITY_ARTIFACTS_DIR is required}"
 session_starts="$city/test-artifacts/session-starts.tsv"
 log="$artifacts/lifecycle-churn.tsv"
-workspace_name="$(
+
+toml_name_from() {
+  local file="$1"
   awk -F ' *= *' '
     $1 == "name" {
       gsub(/"/, "", $2)
       print $2
       exit
     }
-  ' "$city/city.toml"
-)"
+  ' "$file"
+}
+
+workspace_name="${TEST_CITY_TMUX_SOCKET:-$(toml_name_from "$city/city.toml")}"
+if [ -z "$workspace_name" ]; then
+  workspace_name="$(toml_name_from "$city/pack.toml")"
+fi
+if [ -z "$workspace_name" ]; then
+  printf 'lifecycle-churn: could not resolve tmux socket name\n' >&2
+  exit 1
+fi
 
 printf 'timestamp\taction\tdetail\n' >"$log"
 
