@@ -159,8 +159,7 @@
             };
           };
 
-        cityRuntimeDeps = gascityPackage: with pkgs; [
-          gascityPackage
+        cityRuntimeDepsWithoutGascity = with pkgs; [
           dolt
           beads
           tmux
@@ -170,6 +169,10 @@
           procps
           util-linux
         ];
+
+        cityRuntimeDeps = gascityPackage: [
+          gascityPackage
+        ] ++ cityRuntimeDepsWithoutGascity;
 
         harnessDeps = with pkgs; [
           bash
@@ -213,6 +216,15 @@
               exec ${pkgs.bash}/bin/bash ${sourceRoot}/scripts/${name}.sh "$@"
             '';
           };
+
+        runIdlePathGc = pkgs.writeShellApplication {
+          name = "run-idle-path-gc";
+          runtimeInputs = cityRuntimeDepsWithoutGascity ++ harnessDeps;
+          text = ''
+            export TEST_CITY_SOURCE_ROOT=${sourceRoot}
+            exec ${pkgs.bash}/bin/bash ${sourceRoot}/scripts/run-idle-path-gc.sh "$@"
+          '';
+        };
 
         runIdleStockSource = mkIdleDoltAmpRunner {
           name = "run-idle-stock-source";
@@ -277,6 +289,7 @@
             echo "Run idle gascity-nix: nix run .#run-idle-gascity-nix-source"
             echo "Run idle gascity issue-prefix fix: nix run .#run-idle-gascity-issue-prefix-source"
             echo "Run idle gascity dolt-amp fix: nix run .#run-idle-gascity-dolt-amp-source"
+            echo "Run idle PATH gc: nix run .#run-idle-path-gc"
             echo "Tear down: nix run .#tear-down -- /tmp/test-city..."
           '';
         };
@@ -297,6 +310,7 @@
           run-idle-gascity-nix-source = runIdleGascityNixSource;
           run-idle-gascity-issue-prefix-source = runIdleGascityIssuePrefixSource;
           run-idle-gascity-dolt-amp-source = runIdleGascityDoltAmpSource;
+          run-idle-path-gc = runIdlePathGc;
         };
 
         apps = {
@@ -335,6 +349,10 @@
           run-idle-gascity-dolt-amp-source = {
             type = "app";
             program = "${runIdleGascityDoltAmpSource}/bin/run-idle-gascity-dolt-amp-source";
+          };
+          run-idle-path-gc = {
+            type = "app";
+            program = "${runIdlePathGc}/bin/run-idle-path-gc";
           };
         };
       }
